@@ -114,22 +114,38 @@ async function getSubmissionDetails(submissionId) {
     if (res.ok) {
       const json = await res.json();
       const root = json?.data || json || {};
-      const details = root.other_details || {};
+      const result = root.submitResult || root.submit_result || root;
+      const details = root.other_details || root.otherDetails || {};
       const verdict = String(
-        root.result_code || root.verdict || root.status_msg || details.resultCode || "",
+        result.result_code ||
+          root.result_code ||
+          root.verdict ||
+          root.status_msg ||
+          details.resultCode ||
+          details.result_code ||
+          "",
       ).toLowerCase();
+      const language =
+        details.language || result.language || result.language_name || root.language || "";
       const data = {
-        problemCode: details.problemCode || "",
-        problemName: details.problemName || details.problemCode || "",
-        contestCode: details.contestCode || "practice",
-        language: details.language || "",
-        owner: details.userHandle || details.username || root.username || "",
+        problemCode: details.problemCode || root.problemCode || "",
+        problemName: details.problemName || root.problemName || details.problemCode || "",
+        contestCode: details.contestCode || root.contestCode || "practice",
+        language,
+        owner:
+          details.submissionOwnerHandle ||
+          details.userHandle ||
+          details.username ||
+          root.username ||
+          "",
         accepted:
           verdict === "accepted" ||
           verdict === "ac" ||
           verdict === "correct answer" ||
-          Number(root.status_code || details.statusCode) === 15,
-        verdictKnown: Boolean(verdict || root.status_code || details.statusCode),
+          Number(result.status_code || root.status_code || details.statusCode) === 15,
+        verdictKnown: Boolean(
+          verdict || result.status_code || root.status_code || details.statusCode,
+        ),
       };
       if (data.accepted) metaCache.set(submissionId, { at: Date.now(), data });
       return data;
@@ -184,6 +200,22 @@ async function fetchSource(sub) {
   return paced(async () => {
     const subId = sub.id;
     const url = `${CODECHEF}/viewplaintext/${subId}`;
+
+    try {
+      const apiResponse = await fetch(`${CODECHEF}/api/submission-code/${subId}`, {
+        credentials: "include",
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      });
+      if (apiResponse.ok) {
+        const json = await apiResponse.json();
+        const root = json?.data || json || {};
+        const apiSource = root.code || root.sourceCode || root.source || root.solution || "";
+        if (typeof apiSource === "string" && apiSource.trim()) return apiSource;
+      }
+    } catch {
+      // Fall back to the plaintext submission page below.
+    }
 
     let html;
     try {

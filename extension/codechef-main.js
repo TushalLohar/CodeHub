@@ -9,6 +9,7 @@
   const seen = new Set();
   let lastTrustedSubmitAt = 0;
   let lastSubmitRequestAt = 0;
+  let lastSubmissionId = null;
 
   function controlLabel(target) {
     if (!(target instanceof Element)) return "";
@@ -73,12 +74,16 @@
     return { url: String(url), method };
   }
 
-  function pathOf(url) {
+  function parsedUrl(url) {
     try {
-      return new URL(url, location.href).pathname;
+      return new URL(url, location.href);
     } catch {
-      return "";
+      return null;
     }
+  }
+
+  function pathOf(url) {
+    return parsedUrl(url)?.pathname || "";
   }
 
   function isSubmissionStart(url, method) {
@@ -96,40 +101,93 @@
     return /\/api\/ide\/(?:submit|submission)|\/api\/submission|\/submit\/?$/i.test(path);
   }
 
+  function isPotentialSubmissionStart(url, method) {
+    const parsed = parsedUrl(url);
+    return (
+      parsed?.origin === location.origin &&
+      /^(POST|PUT)$/i.test(method) &&
+      recent(lastTrustedSubmitAt)
+    );
+  }
+
   function noteSubmissionStart(url, method) {
-    if (recent(lastTrustedSubmitAt) && isSubmissionStart(url, method)) {
+    if (
+      recent(lastTrustedSubmitAt) &&
+      (isSubmissionStart(url, method) || isPotentialSubmissionStart(url, method))
+    ) {
       lastSubmitRequestAt = Date.now();
     }
   }
 
   function accepted(payload) {
-    const code = String(
-      payload.result_code || payload.status || payload.verdict || "",
-    ).toLowerCase();
-    return code === "accepted" || code === "ac" || Number(payload.status_code) === 15;
+    const values = [
+      payload.result_code,
+      payload.resultCode,
+      payload.status,
+      payload.status_msg,
+      payload.verdict,
+      payload.data?.result_code,
+      payload.data?.status,
+      payload.data?.verdict,
+      payload.result?.result_code,
+      payload.result?.status,
+      payload.result?.verdict,
+      payload.other_details?.resultCode,
+    ]
+      .filter((value) => value !== undefined && value !== null)
+      .map((value) => String(value).trim().toLowerCase());
+    return (
+      values.some(
+        (value) => value === "accepted" || value === "ac" || value === "correct answer",
+      ) ||
+      Number(
+        payload.status_code ??
+          payload.statusCode ??
+          payload.result_code ??
+          payload.data?.status_code ??
+          payload.other_details?.statusCode,
+      ) === 15
+    );
   }
 
-  function submissionId(payload) {
-    const id = payload.submission_id || payload.solution_id || payload.upid || payload.id;
+  function submissionId(payload, url) {
+    const parsed = parsedUrl(url);
+    const pathId = parsed?.pathname.match(
+      /\/(?:viewsolution|viewplaintext|submission|submissions)\/(\d+)/i,
+    )?.[1];
+    const queryId = ["submission_id", "submissionId", "solution_id", "solutionId", "id"]
+      .map((key) => parsed?.searchParams.get(key))
+      .find((value) => /^\d+$/.test(String(value || "")));
+    const id =
+      payload.submission_id ||
+      payload.submissionId ||
+      payload.solution_id ||
+      payload.solutionId ||
+      payload.upid ||
+      payload.id ||
+      payload.data?.submission_id ||
+      payload.data?.solution_id ||
+      payload.result?.submission_id ||
+      payload.result?.solution_id ||
+      queryId ||
+      pathId;
     return /^\d+$/.test(String(id || "")) ? String(id) : null;
   }
 
-  function handlePayload(payload) {
-    if (!payload || typeof payload !== "object" || !recent(lastSubmitRequestAt)) return;
-    const body =
-      payload.data && typeof payload.data === "object" ? { ...payload.data, ...payload } : payload;
-    if (!accepted(body)) return;
-
-    const id = submissionId(body);
+  function emitAccepted(id, payload = {}) {
     if (!id || seen.has(id)) return;
     seen.add(id);
     lastTrustedSubmitAt = 0;
     lastSubmitRequestAt = 0;
+    lastSubmissionId = null;
 
+    const body =
+      payload.data && typeof payload.data === "object" ? { ...payload.data, ...payload } : payload;
     const rawProblemCode =
       body.problemCode ||
       body.problem_code ||
-      (body.other_details && body.other_details.problemCode) ||
+      body.result?.problemCode ||
+      body.other_details?.problemCode ||
       null;
     const problemCode = /^[A-Za-z0-9_]{1,64}$/.test(String(rawProblemCode || ""))
       ? String(rawProblemCode)
@@ -145,10 +203,20 @@
     );
   }
 
-  function inspect(url, text) {
-    if (!isSubmissionRequest(url) || !text || text.length > MAX_RESPONSE_CHARS) return;
+  function handlePayload(payload, url) {
+    if (!payload || typeof payload !== "object" || !recent(lastSubmitRequestAt)) return;
+    const body =
+      payload.data && typeof payload.data === "object" ? { ...payload.data, ...payload } : payload;
+    const id = submissionId(body, url);
+    if (id) lastSubmissionId = id;
+    if (accepted(body)) emitAccepted(id || lastSubmissionId, body);
+  }
+
+  function inspect(url, method, text) {
+    const relevant = isSubmissionRequest(url) || isPotentialSubmissionStart(url, method);
+    if (!relevant || !text || text.length > MAX_RESPONSE_CHARS) return;
     try {
-      handlePayload(JSON.parse(text));
+      handlePayload(JSON.parse(text), url);
     } catch {}
   }
 
@@ -157,12 +225,13 @@
     window.fetch = function (...args) {
       const { url, method } = requestInfo(args[0], args[1]);
       noteSubmissionStart(url, method);
+      const shouldInspect = isSubmissionRequest(url) || isPotentialSubmissionStart(url, method);
       return nativeFetch.apply(this, args).then((response) => {
-        if (isSubmissionRequest(url)) {
+        if (shouldInspect) {
           response
             .clone()
             .text()
-            .then((text) => inspect(url, text))
+            .then((text) => inspect(url, method, text))
             .catch(() => {});
         }
         return response;
@@ -179,10 +248,57 @@
   };
   XMLHttpRequest.prototype.send = function (...args) {
     const url = this.__codehubCodeChefUrl || "";
-    noteSubmissionStart(url, this.__codehubCodeChefMethod || "GET");
-    if (isSubmissionRequest(url)) {
-      this.addEventListener("load", () => inspect(url, this.responseText), { once: true });
+    const method = this.__codehubCodeChefMethod || "GET";
+    noteSubmissionStart(url, method);
+    if (isSubmissionRequest(url) || isPotentialSubmissionStart(url, method)) {
+      this.addEventListener("load", () => inspect(url, method, this.responseText), { once: true });
     }
     return nativeSend.apply(this, args);
   };
+
+  function submissionIdFrom(root) {
+    if (!(root instanceof Element) && root !== document) return null;
+    const selectors = [
+      'a[href*="/viewsolution/"]',
+      'a[href*="/viewplaintext/"]',
+      'a[href*="/submission/"]',
+      'a[href*="/submissions/"]',
+    ].join(",");
+    const elements = root instanceof Element && root.matches(selectors) ? [root] : [];
+    const link = elements[0] || root.querySelector?.(selectors);
+    return link?.getAttribute("href")?.match(/\/(\d+)(?:[/?#]|$)/)?.[1] || null;
+  }
+
+  function containsAcceptedResult(root) {
+    const candidates = [root, ...root.querySelectorAll("div, span, p, h2, h3")];
+    return candidates.some((element) => {
+      if (element.children.length > 0) return false;
+      const text = String(element.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return /^(?:accepted|correct answer)!?$/i.test(text);
+    });
+  }
+
+  const resultObserver = new MutationObserver((mutations) => {
+    if (!recent(lastTrustedSubmitAt) && !recent(lastSubmitRequestAt)) return;
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element) || !containsAcceptedResult(node)) continue;
+        const id = submissionIdFrom(node) || lastSubmissionId || submissionIdFrom(document);
+        if (id) emitAccepted(id);
+        return;
+      }
+    }
+  });
+
+  function observeResults() {
+    if (!document.documentElement) return false;
+    resultObserver.observe(document.documentElement, { childList: true, subtree: true });
+    return true;
+  }
+
+  if (!observeResults()) {
+    document.addEventListener("DOMContentLoaded", observeResults, { once: true });
+  }
 })();

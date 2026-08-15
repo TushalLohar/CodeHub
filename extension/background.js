@@ -449,7 +449,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     if (msg.type === "codechef-accepted") {
       const submissionId = textValue(msg.submissionId, "CodeChef submission id", 32);
-      if (!/^\d+$/.test(submissionId)) {
+      const submittedAt = Number(msg.submittedAt || 0);
+      if (
+        !/^\d+$/.test(submissionId) ||
+        !Number.isSafeInteger(submittedAt) ||
+        submittedAt <= 0 ||
+        Date.now() - submittedAt > 15 * 60 * 1000 ||
+        submittedAt - Date.now() > 30 * 1000
+      ) {
         return sendResponse({ ok: false, error: "Invalid CodeChef submission id." });
       }
       const problemCode = textValue(msg.problemCode, "CodeChef problem code", 80);

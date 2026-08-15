@@ -63,9 +63,10 @@
   );
 
   function consumeRecentSubmit() {
-    if (!lastTrustedSubmitAt || Date.now() - lastTrustedSubmitAt > SUBMIT_TTL_MS) return false;
+    if (!lastTrustedSubmitAt || Date.now() - lastTrustedSubmitAt > SUBMIT_TTL_MS) return 0;
+    const submittedAt = lastTrustedSubmitAt;
     lastTrustedSubmitAt = 0;
-    return true;
+    return submittedAt;
   }
 
   function problemCodeFromPage() {
@@ -81,7 +82,7 @@
     return /^[A-Za-z0-9_]{1,64}$/.test(text) ? text : null;
   }
 
-  async function report(id, problemCode) {
+  async function report(id, problemCode, submittedAt) {
     if (reported.has(id) || reporting.has(id)) return;
     reporting.add(id);
     try {
@@ -91,6 +92,7 @@
             type: "codechef-accepted",
             submissionId: id,
             problemCode: problemCode || undefined,
+            submittedAt,
           });
           if (response?.ok || response?.queued) {
             reported.add(id);
@@ -110,10 +112,12 @@
     if (!data || data.type !== "__CF_SYNC_CC_ACCEPTED__") return;
 
     const id = String(data.submissionId || "");
-    if (!/^\d+$/.test(id) || !consumeRecentSubmit()) return;
+    if (!/^\d+$/.test(id)) return;
+    const submittedAt = consumeRecentSubmit();
+    if (!submittedAt) return;
 
     const rawProblemCode = String(data.problemCode || problemCodeFromPage() || "");
     const problemCode = /^[A-Za-z0-9_]{1,64}$/.test(rawProblemCode) ? rawProblemCode : null;
-    report(id, problemCode);
+    report(id, problemCode, submittedAt);
   });
 })();

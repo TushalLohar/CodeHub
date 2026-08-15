@@ -10,6 +10,7 @@
   const pending = new Map();
   let lastTrustedSubmitAt = 0;
   let lastSubmitRequestAt = 0;
+  let lastStatusSubmissionId = null;
 
   function controlLabel(target) {
     if (!(target instanceof Element)) return "";
@@ -78,6 +79,15 @@
     );
   }
 
+  function isPotentialSubmissionStart(url, method) {
+    const parsed = parsedUrl(url);
+    return (
+      parsed?.origin === location.origin &&
+      String(method).toUpperCase() === "POST" &&
+      recent(lastTrustedSubmitAt)
+    );
+  }
+
   function statusSubmissionId(url) {
     const path = parsedUrl(url)?.pathname || "";
     return path.match(/\/submissions\/detail\/(\d+)\/check\/?$/i)?.[1] || null;
@@ -105,12 +115,55 @@
       data.id ||
       data.data?.submission_id ||
       data.data?.submissionId ||
+      data.data?.submitSolution?.submissionId ||
+      data.submitSolution?.submissionId ||
       statusSubmissionId(url);
     return /^\d+$/.test(String(id || "")) ? String(id) : null;
   }
 
+  function isAccepted(data) {
+    const status = [
+      data.status_msg,
+      data.statusMsg,
+      data.status,
+      data.state,
+      data.data?.status_msg,
+      data.data?.statusMsg,
+      data.data?.status,
+      data.data?.state,
+    ]
+      .filter((value) => value !== undefined && value !== null)
+      .join(" ");
+    if (/\baccepted\b/i.test(status)) return true;
+
+    const statusCode = Number(data.status_code ?? data.statusCode ?? data.data?.status_code);
+    const finished = data.finished ?? data.data?.finished;
+    const state = String(data.state || data.data?.state || "");
+    return statusCode === 10 && (finished === true || /success/i.test(state));
+  }
+
+  function emitAccepted(id) {
+    const numericId = /^\d+$/.test(String(id || "")) ? String(id) : null;
+    const slug = slugFromLocation();
+    const key = numericId || `slug:${slug || "unknown"}`;
+    if (emitted.has(key)) return;
+
+    emitted.add(key);
+    lastTrustedSubmitAt = 0;
+    lastSubmitRequestAt = 0;
+    window.postMessage(
+      {
+        type: "__CODEHUB_LC_ACCEPTED__",
+        submissionId: numericId || undefined,
+        slug,
+      },
+      location.origin,
+    );
+  }
+
   function inspect(url, method, text) {
-    if (!text || text.length > MAX_RESPONSE_CHARS || !isRelevantRequest(url, method)) return;
+    const relevant = isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
+    if (!text || text.length > MAX_RESPONSE_CHARS || !relevant) return;
 
     let data;
     try {
@@ -120,37 +173,34 @@
     }
 
     const id = payloadId(data, url);
-    if (isSubmissionStart(url, method) && id && recent(lastSubmitRequestAt)) {
+    const statusId = statusSubmissionId(url);
+    if (statusId) lastStatusSubmissionId = statusId;
+
+    if (id && recent(lastTrustedSubmitAt) && String(method).toUpperCase() === "POST") {
+      lastSubmitRequestAt = Date.now();
       pending.set(id, Date.now());
     }
 
-    const status = String(
-      data.status_msg || data.statusMsg || data.status || data.data?.status_msg || "",
-    );
-    if (!id || !/accepted/i.test(status) || emitted.has(id)) return;
+    if (!id || !isAccepted(data)) return;
 
     const pendingAt = pending.get(id) || 0;
-    if (!recent(pendingAt) && !recent(lastSubmitRequestAt)) return;
+    if (!recent(pendingAt) && !recent(lastSubmitRequestAt) && !recent(lastTrustedSubmitAt)) return;
 
-    emitted.add(id);
     pending.delete(id);
-    lastTrustedSubmitAt = 0;
-    lastSubmitRequestAt = 0;
-    window.postMessage(
-      { type: "__CODEHUB_LC_ACCEPTED__", submissionId: id, slug: slugFromLocation() },
-      location.origin,
-    );
+    emitAccepted(id);
   }
 
   const nativeFetch = window.fetch;
   if (typeof nativeFetch === "function") {
     window.fetch = function (...args) {
       const { url, method } = requestInfo(args[0], args[1]);
-      if (isSubmissionStart(url, method) && recent(lastTrustedSubmitAt)) {
+      const shouldInspect =
+        isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
+      if (isPotentialSubmissionStart(url, method)) {
         lastSubmitRequestAt = Date.now();
       }
       return nativeFetch.apply(this, args).then((response) => {
-        if (isRelevantRequest(url, method)) {
+        if (shouldInspect) {
           response
             .clone()
             .text()
@@ -172,12 +222,57 @@
   XMLHttpRequest.prototype.send = function (...args) {
     const url = this.__codehubLeetCodeUrl || "";
     const method = this.__codehubLeetCodeMethod || "GET";
-    if (isSubmissionStart(url, method) && recent(lastTrustedSubmitAt)) {
+    const shouldInspect = isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
+    if (isPotentialSubmissionStart(url, method)) {
       lastSubmitRequestAt = Date.now();
     }
-    if (isRelevantRequest(url, method)) {
+    if (shouldInspect) {
       this.addEventListener("load", () => inspect(url, method, this.responseText), { once: true });
     }
     return nativeSend.apply(this, args);
   };
+
+  function submissionIdFrom(root) {
+    if (!(root instanceof Element) && root !== document) return null;
+    const directHref = root instanceof Element ? root.getAttribute("href") : null;
+    const directId = directHref?.match(/\/submissions\/detail\/(\d+)/i)?.[1];
+    if (directId) return directId;
+    const link = root.querySelector?.('a[href*="/submissions/detail/"]');
+    return link?.getAttribute("href")?.match(/\/submissions\/detail\/(\d+)/i)?.[1] || null;
+  }
+
+  function containsAcceptedResult(root) {
+    const candidates = [root, ...root.querySelectorAll("div, span, p, h2, h3")];
+    return candidates.some((element) => {
+      if (element.children.length > 0) return false;
+      const text = String(element.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return /^accepted!?$/i.test(text);
+    });
+  }
+
+  const resultObserver = new MutationObserver((mutations) => {
+    if (!recent(lastTrustedSubmitAt)) return;
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof Element)) continue;
+        if (!containsAcceptedResult(node)) continue;
+        emitAccepted(
+          submissionIdFrom(node) || lastStatusSubmissionId || submissionIdFrom(document),
+        );
+        return;
+      }
+    }
+  });
+
+  function observeResults() {
+    if (!document.documentElement) return false;
+    resultObserver.observe(document.documentElement, { childList: true, subtree: true });
+    return true;
+  }
+
+  if (!observeResults()) {
+    document.addEventListener("DOMContentLoaded", observeResults, { once: true });
+  }
 })();

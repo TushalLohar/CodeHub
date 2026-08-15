@@ -56,9 +56,10 @@
   );
 
   function consumeRecentSubmit() {
-    if (!lastTrustedSubmitAt || Date.now() - lastTrustedSubmitAt > SUBMIT_TTL_MS) return false;
+    if (!lastTrustedSubmitAt || Date.now() - lastTrustedSubmitAt > SUBMIT_TTL_MS) return 0;
+    const submittedAt = lastTrustedSubmitAt;
     lastTrustedSubmitAt = 0;
-    return true;
+    return submittedAt;
   }
 
   function slugFromLocation() {
@@ -66,26 +67,28 @@
     return /^[a-z0-9-]{1,180}$/i.test(slug) ? slug : null;
   }
 
-  async function report(id, slug) {
-    if (seen.has(id) || reporting.has(id)) return;
-    reporting.add(id);
+  async function report(id, slug, submittedAt) {
+    const key = id || `slug:${slug}`;
+    if (seen.has(key) || reporting.has(key)) return;
+    reporting.add(key);
     try {
       for (let attempt = 0; attempt < 6; attempt += 1) {
         try {
           const response = await chrome.runtime.sendMessage({
             type: "lc-accepted",
-            submissionId: id,
+            submissionId: id || undefined,
             slug: slug || undefined,
+            submittedAt,
           });
           if (response?.ok || response?.queued) {
-            seen.add(id);
+            seen.add(key);
             return;
           }
         } catch {}
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     } finally {
-      reporting.delete(id);
+      reporting.delete(key);
     }
   }
 
@@ -95,10 +98,13 @@
     if (!data || data.type !== "__CODEHUB_LC_ACCEPTED__") return;
 
     const id = String(data.submissionId || "");
-    if (!/^\d+$/.test(id) || !consumeRecentSubmit()) return;
+    if (id && !/^\d+$/.test(id)) return;
+    const submittedAt = consumeRecentSubmit();
+    if (!submittedAt) return;
 
     const rawSlug = String(data.slug || slugFromLocation() || "");
     const slug = /^[a-z0-9-]{1,180}$/i.test(rawSlug) ? rawSlug : null;
-    report(id, slug);
+    if (!id && !slug) return;
+    report(id, slug, submittedAt);
   });
 })();

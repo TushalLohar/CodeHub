@@ -386,24 +386,42 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "lc-accepted") {
       const incomingId = textValue(msg.submissionId, "LeetCode submission id", 32);
       const incomingSlug = textValue(msg.slug, "LeetCode problem slug", 180);
-      if (!/^\d+$/.test(incomingId)) {
+      const submittedAt = Number(msg.submittedAt || 0);
+      if (
+        (incomingId && !/^\d+$/.test(incomingId)) ||
+        (!incomingId && !incomingSlug) ||
+        !Number.isSafeInteger(submittedAt) ||
+        submittedAt <= 0 ||
+        Date.now() - submittedAt > 15 * 60 * 1000 ||
+        submittedAt - Date.now() > 30 * 1000
+      ) {
         return sendResponse({ ok: false, error: "Invalid LeetCode submission id." });
       }
       return sendResponse(
         await handleAccepted("leetcode", "LeetCode", async () => {
           let match = null;
           for (let attempt = 0; attempt < 4 && !match; attempt++) {
-            const recent = await lc.fetchSubmissions(10).catch(() => []);
-            match = recent.find((submission) => String(submission.id) === incomingId) || null;
+            const recent = await lc.fetchSubmissions(20).catch(() => []);
+            match = incomingId
+              ? recent.find((submission) => String(submission.id) === incomingId) || null
+              : recent.find(
+                  (submission) =>
+                    submission.slug === incomingSlug &&
+                    submission.timestamp > 0 &&
+                    submission.timestamp >= submittedAt - 5000,
+                ) || null;
             if (!match && attempt < 3) await new Promise((resolve) => setTimeout(resolve, 750));
           }
           if (!match || (incomingSlug && match.slug !== incomingSlug)) {
             throw new Error("LeetCode has not confirmed this accepted submission yet.");
           }
+          if (match.timestamp > 0 && match.timestamp < submittedAt - 5000) {
+            throw new Error("LeetCode rejected an older accepted submission.");
+          }
           if (match.timestamp > 0 && Date.now() - match.timestamp > 60 * 60 * 1000) {
             throw new Error("LeetCode rejected a stale submission event.");
           }
-          return { id: incomingId, slug: match.slug || incomingSlug || undefined };
+          return { id: String(match.id), slug: match.slug || incomingSlug || undefined };
         }),
       );
     }

@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-rated-grey: var(--rated-grey);
+  --color-rated-green: var(--rated-green);
+  --color-rated-cyan: var(--rated-cyan);
+  --color-rated-blue: var(--rated-blue);
+  --color-rated-violet: var(--rated-violet);
+  --color-rated-orange: var(--rated-orange);
+  --color-rated-red: var(--rated-red);
+  --font-display: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root {
+  --radius: 0.65rem;
+  --background: oklch(0.14 0.02 260);
+  --foreground: oklch(0.96 0.008 250);
+  --card: oklch(0.18 0.022 260);
+  --card-foreground: oklch(0.96 0.008 250);
+  --primary: oklch(0.72 0.16 245);
+  --primary-foreground: oklch(0.14 0.03 250);
+  --secondary: oklch(0.24 0.025 260);
+  --secondary-foreground: oklch(0.96 0.008 250);
+  --muted: oklch(0.22 0.022 260);
+  --muted-foreground: oklch(0.7 0.02 255);
+  --accent: oklch(0.8 0.17 165);
+  --accent-foreground: oklch(0.14 0.03 250);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(0.28 0.025 260);
+  --input: oklch(0.28 0.025 260);
+  --ring: oklch(0.72 0.16 245);
+  --rated-grey: oklch(0.7 0.012 250);
+  --rated-green: oklch(0.76 0.17 148);
+  --rated-cyan: oklch(0.79 0.12 195);
+  --rated-blue: oklch(0.7 0.15 250);
+  --rated-violet: oklch(0.66 0.19 305);
+  --rated-orange: oklch(0.77 0.16 62);
+  --rated-red: oklch(0.65 0.21 25);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(55rem 35rem at 50% -10%, oklch(0.72 0.16 245 / 0.16), transparent 70%),
+      radial-gradient(40rem 25rem at 85% 60%, oklch(0.8 0.17 165 / 0.06), transparent 60%),
+      linear-gradient(oklch(1 0 0 / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(1 0 0 / 0.025) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      100% 100%,
+      3.5rem 3.5rem,
+      3.5rem 3.5rem;
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+}
+
+.glass-card {
+  background: oklch(0.18 0.022 260 / 0.75);
+  backdrop-filter: blur(16px);
+  border: 1px solid oklch(0.3 0.025 260 / 0.6);
+  box-shadow: 0 4px 20px -2px oklch(0 0 0 / 0.3);
+}
+
+.glass-card-hover {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-hover:hover {
+  border-color: oklch(0.72 0.16 245 / 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -4px oklch(0.72 0.16 245 / 0.15);
+}

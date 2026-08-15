@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CodeHub</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-logo">CF<span class="accent-slash">/</span>SYNC</span>
+          <span class="version-chip">v4.1</span>
+        </div>
+        <div class="status-indicator">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="statusText" class="status-text">Ready</span>
+        </div>
+      </header>
+
+      <div id="banner" class="banner hidden">
+        <div class="banner-icon">⚠️</div>
+        <div class="banner-content">
+          <strong id="bannerTitle">Session expired</strong>
+          <p id="bannerText">Sign in to your platform to continue syncing.</p>
+          <a id="bannerLink" href="#" target="_blank" rel="noreferrer">Reconnect account →</a>
+        </div>
+      </div>
+
+      <section id="setup" class="panel hidden">
+        <div class="panel-header">
+          <h1>Configure Live Sync</h1>
+          <p class="panel-desc">Connect your handles and GitHub repository.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="handle">Codeforces Handle</label>
+          <input id="handle" placeholder="your_handle" autocomplete="off" spellcheck="false" />
+        </div>
+
+        <div class="form-group">
+          <label for="codechefHandle">CodeChef Username</label>
+          <input
+            id="codechefHandle"
+            placeholder="your_username"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="gfgHandle">GeeksforGeeks Username</label>
+          <input id="gfgHandle" placeholder="your_username" autocomplete="off" spellcheck="false" />
+        </div>
+
+        <div class="form-group">
+          <label>GitHub</label>
+          <div class="github-connect-row">
+            <span id="githubStatus" class="github-status not-connected">Not connected</span>
+            <button id="githubConnect" type="button" class="btn btn-ghost">
+              <span>Connect GitHub</span>
+            </button>
+          </div>
+          <small class="helper-text"
+            >Authorize CodeHub to create and write a public solutions repo. No token to
+            paste.</small
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="repo">Repository Name</label>
+          <input id="repo" value="CP-Solutions" autocomplete="off" spellcheck="false" />
+        </div>
+
+        <div class="form-group">
+          <label class="group-label">Active Platforms</label>
+          <div class="platforms-grid">
+            <label class="platform-toggle" data-platform="cf">
+              <input id="platformCF" type="checkbox" checked />
+              <span class="toggle-pill cf-pill">
+                <span class="pill-dot"></span>
+                Codeforces
+              </span>
+            </label>
+            <label class="platform-toggle" data-platform="lc">
+              <input id="platformLC" type="checkbox" checked />
+              <span class="toggle-pill lc-pill">
+                <span class="pill-dot"></span>
+                LeetCode
+              </span>
+            </label>
+            <label class="platform-toggle" data-platform="cses">
+              <input id="platformCSES" type="checkbox" checked />
+              <span class="toggle-pill cses-pill">
+                <span class="pill-dot"></span>
+                CSES
+              </span>
+            </label>
+            <label class="platform-toggle" data-platform="codechef">
+              <input id="platformCodeChef" type="checkbox" checked />
+              <span class="toggle-pill codechef-pill">
+                <span class="pill-dot"></span>
+                CodeChef
+              </span>
+            </label>
+            <label class="platform-toggle" data-platform="gfg">
+              <input id="platformGFG" type="checkbox" checked />
+              <span class="toggle-pill gfg-pill">
+                <span class="pill-dot"></span>
+                GeeksforGeeks
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="topicPriority">LeetCode Topic Priority (Optional)</label>
+          <textarea
+            id="topicPriority"
+            rows="2"
+            placeholder="binary-search&#10;dynamic-programming&#10;graph"
+            spellcheck="false"
+          ></textarea>
+          <small class="helper-text">One topic per line. Earlier tags take precedence.</small>
+        </div>
+
+        <button id="save" class="btn btn-primary">
+          <span class="btn-text">Verify &amp; Save</span>
+        </button>
+        <p id="setupError" class="error-banner hidden"></p>
+      </section>
+
+      <section id="status" class="panel hidden">
+        <div class="connected-card">
+          <div class="connected-header">
+            <span class="pulse-indicator"></span>
+            <span class="connected-title">Live Sync Active</span>
+          </div>
+          <a
+            id="repoLink"
+            class="repo-chip"
+            href="#"
+            target="_blank"
+            rel="noreferrer"
+            title="Open repository on GitHub"
+          >
+            <svg class="gh-icon" viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            <span id="repoLine" class="repo-name"></span>
+            <span class="external-arrow">↗</span>
+          </a>
+          <div id="lastSyncLine" class="last-sync-line hidden"></div>
+          <div class="active-platforms-row" id="activeBadges">
+            <span class="mini-badge cf-mini">CF</span>
+            <span class="mini-badge lc-mini">LC</span>
+            <span class="mini-badge cses-mini">CSES</span>
+            <span class="mini-badge codechef-mini">CC</span>
+            <span class="mini-badge gfg-mini">GFG</span>
+          </div>
+        </div>
+
+        <div class="sync-info-card">
+          <div class="sync-info-header">
+            <span class="sync-sparkle">⚡</span>
+            <div>
+              <h3>Real-Time Live Sync</h3>
+              <p class="sync-subtitle">Automatic commits whenever you solve problems</p>
+            </div>
+          </div>
+          <div class="platform-paths-list">
+            <div class="path-item">
+              <span class="path-badge cf-mini">Codeforces</span>
+              <code>codeforces/&lt;rating&gt;/</code>
+            </div>
+            <div class="path-item">
+              <span class="path-badge lc-mini">LeetCode</span>
+              <code>leetcode/&lt;topic&gt;/</code>
+            </div>
+            <div class="path-item">
+              <span class="path-badge cses-mini">CSES</span>
+              <code>cses/&lt;section&gt;/</code>
+            </div>
+            <div class="path-item">
+              <span class="path-badge codechef-mini">CodeChef</span>
+              <code>codechef/&lt;rating&gt;/</code>
+            </div>
+            <div class="path-item">
+              <span class="path-badge gfg-mini">GeeksforGeeks</span>
+              <code>geeksforgeeks/&lt;difficulty&gt;/</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-actions">
+          <button id="edit" class="btn btn-secondary">
+            <span>⚙️ Edit Settings</span>
+          </button>
+          <button id="disconnectGithub" class="btn btn-danger-link">
+            <span>Disconnect GitHub</span>
+          </button>
+          <button id="reset" class="btn btn-danger-link">
+            <span>Reset Data</span>
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

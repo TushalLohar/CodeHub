@@ -1,0 +1,661 @@
+import * as store from "./storage.js";
+import * as cf from "./cf.js";
+import * as lc from "./leetcode.js";
+import * as cses from "./cses.js";
+import * as codechef from "./codechef.js";
+import * as gfg from "./gfg.js";
+import * as sync from "./sync.js";
+import * as gh from "./github.js";
+import * as oauth from "./oauth.js";
+import { enabledPlatforms, sessionKeyFor } from "./platforms.js";
+
+const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
+const MAX_FIELD_LENGTH = 256;
+const WITNESS_TTL_MS = 15 * 60 * 1000;
+const TEXT_ENCODER = new TextEncoder();
+
+const PLATFORM_MESSAGE_HOSTS = {
+  "cf-accepted": ["codeforces.com"],
+  "lc-accepted": ["leetcode.com"],
+  "cses-accepted": ["cses.fi"],
+  "codechef-accepted": ["codechef.com"],
+  "gfg-accepted": ["geeksforgeeks.org"],
+  "cf-witness": ["codeforces.com"],
+  "cses-witness": ["cses.fi"],
+  "gfg-witness": ["geeksforgeeks.org"],
+};
+
+const POPUP_MESSAGES = new Set([
+  "status",
+  "check-session",
+  "save-config",
+  "github-disconnect",
+  "reset",
+]);
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isTrustedExtensionSender(sender) {
+  return sender?.id === chrome.runtime.id;
+}
+
+function isPopupSender(sender) {
+  return (
+    isTrustedExtensionSender(sender) &&
+    !sender.tab &&
+    sender.url === chrome.runtime.getURL("popup.html")
+  );
+}
+
+function hostMatches(hostname, domains) {
+  return domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+}
+
+function isPlatformSender(sender, messageType) {
+  if (!isTrustedExtensionSender(sender) || !sender.tab || !Number.isInteger(sender.tab.id)) {
+    return false;
+  }
+  try {
+    const url = new URL(sender.url || "");
+    return (
+      url.protocol === "https:" && hostMatches(url.hostname, PLATFORM_MESSAGE_HOSTS[messageType])
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isAuthorizedMessage(msg, sender) {
+  if (!isRecord(msg) || typeof msg.type !== "string") return false;
+  if (Object.hasOwn(PLATFORM_MESSAGE_HOSTS, msg.type)) {
+    return isPlatformSender(sender, msg.type);
+  }
+  return POPUP_MESSAGES.has(msg.type) && isPopupSender(sender);
+}
+
+function errorText(error, fallback = "Request failed") {
+  const raw = error instanceof Error ? error.message : String(error || fallback);
+  return raw
+    .replace(/Bearer\s+[^\s)]+/gi, "Bearer [redacted]")
+    .replace(/(token|secret|client_secret)\s*[:=]\s*[^\s,;}]+/gi, "$1=[redacted]")
+    .slice(0, 500);
+}
+
+function sourceValue(value) {
+  if (value == null) return null;
+  if (
+    typeof value !== "string" ||
+    value.length > MAX_SOURCE_BYTES ||
+    TEXT_ENCODER.encode(value).byteLength > MAX_SOURCE_BYTES
+  ) {
+    throw new Error("Source code is too large to sync (maximum 2 MB).");
+  }
+  return value;
+}
+
+function textValue(value, label, max = MAX_FIELD_LENGTH) {
+  if (value == null) return "";
+  if (typeof value !== "string" || value.length > max || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new Error(`Invalid ${label}.`);
+  }
+  return value.trim();
+}
+
+function multilineValue(value, label, max) {
+  if (value == null) return "";
+  if (
+    typeof value !== "string" ||
+    value.length > max ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+  ) {
+    throw new Error(`Invalid ${label}.`);
+  }
+  return value.trim();
+}
+
+function publicConfig(config) {
+  if (!config || typeof config !== "object") return null;
+  return {
+    handle: config.handle || "",
+    codechefHandle: config.codechefHandle || "",
+    gfgHandle: config.gfgHandle || "",
+    repo: config.repo || "",
+    owner: config.owner || "",
+    platforms: config.platforms || {},
+    topicPriority: config.topicPriority || "",
+    setupComplete: config.setupComplete !== false,
+    hasToken: typeof config.token === "string" && config.token.length > 0,
+  };
+}
+
+function witnessKey(messageType, tabId) {
+  return `submissionWitness:${messageType}:${tabId}`;
+}
+
+function validateProblemUrl(value) {
+  const raw = textValue(value, "problem URL", 500);
+  if (!raw) return "";
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Invalid GeeksforGeeks problem URL.");
+  }
+  if (url.protocol !== "https:" || !hostMatches(url.hostname, ["geeksforgeeks.org"])) {
+    throw new Error("Invalid GeeksforGeeks problem URL.");
+  }
+  return url.toString();
+}
+
+function sanitizeWitness(messageType, value) {
+  if (!isRecord(value)) throw new Error("Invalid submission witness.");
+
+  if (messageType === "cf-witness") {
+    const contestId = textValue(value.contestId, "Codeforces contest id", 24);
+    const problemIndex = textValue(value.problemIndex, "Codeforces problem index", 24);
+    if (
+      (contestId && !/^\d+$/.test(contestId)) ||
+      (problemIndex && !/^[A-Za-z0-9]+$/.test(problemIndex))
+    ) {
+      throw new Error("Invalid Codeforces submission witness.");
+    }
+    return {
+      contestId: contestId || null,
+      problemIndex: problemIndex || null,
+      problemName: textValue(value.problemName, "Codeforces problem name") || null,
+      language: textValue(value.language, "Codeforces language", 100) || null,
+    };
+  }
+
+  if (messageType === "cses-witness") {
+    const taskId = textValue(value.taskId, "CSES task id", 32);
+    if (!/^\d+$/.test(taskId)) throw new Error("Invalid CSES submission witness.");
+    return { taskId };
+  }
+
+  const slug = textValue(value.slug, "GeeksforGeeks problem slug", 180);
+  if (!/^[A-Za-z0-9_-]+$/.test(slug)) {
+    throw new Error("Invalid GeeksforGeeks submission witness.");
+  }
+  return {
+    slug,
+    title: textValue(value.title, "GeeksforGeeks problem title") || null,
+    difficulty: textValue(value.difficulty, "GeeksforGeeks difficulty", 32) || null,
+    language: textValue(value.language, "GeeksforGeeks language", 100) || null,
+    url: validateProblemUrl(value.url) || null,
+  };
+}
+
+async function handleWitnessMessage(msg, sender) {
+  const key = witnessKey(msg.type, sender.tab.id);
+  if (msg.action === "clear") {
+    await chrome.storage.session.remove(key);
+    return { ok: true };
+  }
+  if (msg.action === "get") {
+    const stored = (await chrome.storage.session.get(key))[key];
+    if (!stored || Date.now() - Number(stored.at || 0) > WITNESS_TTL_MS) {
+      if (stored) await chrome.storage.session.remove(key);
+      return { ok: true, witness: null };
+    }
+    return { ok: true, witness: { ...stored.data, time: stored.at } };
+  }
+  if (msg.action !== "set") throw new Error("Invalid submission witness action.");
+
+  const data = sanitizeWitness(msg.type, msg.data);
+  const at = Date.now();
+  await chrome.storage.session.set({ [key]: { at, data } });
+  return { ok: true, witness: { ...data, time: at } };
+}
+
+// Manifest content scripts only attach after a navigation. Inject into
+// already-open platform tabs so saving settings or reloading the extension does
+// not leave live sync inactive until every tab is reloaded.
+const LIVE_SCRIPTS = [
+  { matches: ["https://codeforces.com/*"], files: ["content.js"], world: "ISOLATED" },
+  { matches: ["https://leetcode.com/*"], files: ["leetcode-main.js"], world: "MAIN" },
+  { matches: ["https://leetcode.com/*"], files: ["content-leetcode.js"], world: "ISOLATED" },
+  { matches: ["https://cses.fi/*"], files: ["content-cses.js"], world: "ISOLATED" },
+  {
+    matches: ["https://*.codechef.com/*", "https://codechef.com/*"],
+    files: ["codechef-main.js"],
+    world: "MAIN",
+  },
+  {
+    matches: ["https://*.codechef.com/*", "https://codechef.com/*"],
+    files: ["content-codechef.js"],
+    world: "ISOLATED",
+  },
+  {
+    matches: ["https://*.geeksforgeeks.org/*", "https://geeksforgeeks.org/*"],
+    files: ["content-gfg.js"],
+    world: "ISOLATED",
+  },
+];
+
+async function installLiveDetectors() {
+  if (!chrome.scripting?.executeScript || !chrome.tabs?.query) return;
+  for (const script of LIVE_SCRIPTS) {
+    const tabs = await chrome.tabs.query({ url: script.matches }).catch(() => []);
+    await Promise.all(
+      tabs
+        .filter((tab) => Number.isInteger(tab.id))
+        .map((tab) =>
+          chrome.scripting
+            .executeScript({
+              target: { tabId: tab.id },
+              files: script.files,
+              world: script.world,
+            })
+            .catch(() => {}),
+        ),
+    );
+  }
+}
+
+async function handleAccepted(platform, label, build) {
+  const config = await store.getConfig();
+  if (!config) {
+    await store.setLastSync({ platform: label, status: "failed", error: "Finish setup first" });
+    return { ok: false, error: "Finish setup first" };
+  }
+  if (config.setupComplete === false) {
+    await store.setLastSync({ platform: label, status: "failed", error: "Finish setup first" });
+    return { ok: false, error: "Finish setup first" };
+  }
+  if (config.platforms?.[platform] === false) {
+    return { ok: false, error: `${label} is not enabled` };
+  }
+  try {
+    const submission = await build(config);
+    if (!submission || !submission.id) {
+      await store.setLastSync({
+        platform: label,
+        status: "failed",
+        error: "Submission not found yet",
+      });
+      return { ok: false, retry: true };
+    }
+    const result = await sync.processLive(platform, submission);
+    const title = result?.meta?.title || submission.problemName || submission.title || "solution";
+    if (result.outcome === "duplicate" || result.outcome === "unchanged") {
+      await store.setLastSync({ platform: label, title, status: "already synced" });
+      return { ok: true, queued: true };
+    }
+    if (result.outcome === "failed") {
+      const errMsg = errorText(result.error);
+      const safeResult = { ...result, error: errMsg };
+      // A revoked/expired OAuth token must flip the popup back to "Connect
+      // GitHub" instead of looping on a token that will never work again.
+      if (errMsg.includes("(401)")) {
+        const cfg = await store.getConfig();
+        if (cfg) await store.setConfig({ ...cfg, token: "", owner: "" });
+        await store.setLastSync({
+          platform: label,
+          title,
+          status: "failed",
+          error: "GitHub access expired — reconnect GitHub",
+        });
+        return { ok: false, queued: true, result: safeResult, reauth: true };
+      }
+      await store.setLastSync({
+        platform: label,
+        title,
+        status: "failed",
+        error: errMsg,
+      });
+      return { ok: false, queued: true, result: safeResult };
+    }
+    await store.setLastSync({
+      platform: label,
+      title,
+      status: "committed",
+      path: result?.meta?.path || "",
+    });
+    return { ok: true, queued: true, result };
+  } catch (err) {
+    const message = errorText(err);
+    await store.setLastSync({ platform: label, status: "failed", error: message });
+    return { ok: false, retry: true, error: message };
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  store
+    .migrate()
+    .then(() => installLiveDetectors())
+    .catch(() => {});
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  store.migrate().catch(() => {});
+});
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  (async () => {
+    await store.accessReady;
+    if (!isAuthorizedMessage(msg, sender)) {
+      return sendResponse({ ok: false, error: "Forbidden" });
+    }
+
+    if (msg.type === "cf-witness" || msg.type === "cses-witness" || msg.type === "gfg-witness") {
+      return sendResponse(await handleWitnessMessage(msg, sender));
+    }
+
+    if (msg.type === "cf-accepted") {
+      const submissionId = textValue(msg.submissionId, "Codeforces submission id", 32);
+      if (!/^\d+$/.test(submissionId)) {
+        return sendResponse({ ok: false, error: "Invalid Codeforces submission id." });
+      }
+      const contestId = textValue(msg.contestId, "Codeforces contest id", 24);
+      const problemIndex = textValue(msg.problemIndex, "Codeforces problem index", 24);
+      const problemName = textValue(msg.problemName, "Codeforces problem name");
+      const language = textValue(msg.language, "Codeforces language", 100);
+      const source = sourceValue(msg.source);
+      return sendResponse(
+        await handleAccepted("codeforces", "Codeforces", async (config) => {
+          let match = null;
+          const handle = config.handle || "";
+          for (let attempt = 0; handle && attempt < 4 && !match; attempt++) {
+            const submissions = await cf.getAcceptedSubmissions(handle, 100).catch(() => []);
+            match = submissions.find((sub) => String(sub.id) === submissionId);
+            if (!match && attempt < 3) await new Promise((r) => setTimeout(r, 750));
+          }
+          if (!match) {
+            throw new Error("Codeforces has not confirmed this accepted submission yet.");
+          }
+          const submittedAt = Number(match.creationTimeSeconds || 0) * 1000;
+          if (submittedAt > 0 && Date.now() - submittedAt > 60 * 60 * 1000) {
+            throw new Error("Codeforces rejected a stale submission event.");
+          }
+          if (contestId && !match.contestId) match.contestId = contestId;
+          if (problemIndex || problemName) {
+            match.problem = match.problem || {};
+            if (problemIndex && !match.problem.index) match.problem.index = problemIndex;
+            if (problemName && !match.problem.name) match.problem.name = problemName;
+          }
+          if (language && !match.programmingLanguage) match.programmingLanguage = language;
+          match.source = source;
+          return match;
+        }),
+      );
+    }
+
+    if (msg.type === "lc-accepted") {
+      const incomingId = textValue(msg.submissionId, "LeetCode submission id", 32);
+      const incomingSlug = textValue(msg.slug, "LeetCode problem slug", 180);
+      if (!/^\d+$/.test(incomingId)) {
+        return sendResponse({ ok: false, error: "Invalid LeetCode submission id." });
+      }
+      return sendResponse(
+        await handleAccepted("leetcode", "LeetCode", async () => {
+          let match = null;
+          for (let attempt = 0; attempt < 4 && !match; attempt++) {
+            const recent = await lc.fetchSubmissions(10).catch(() => []);
+            match = recent.find((submission) => String(submission.id) === incomingId) || null;
+            if (!match && attempt < 3) await new Promise((resolve) => setTimeout(resolve, 750));
+          }
+          if (!match || (incomingSlug && match.slug !== incomingSlug)) {
+            throw new Error("LeetCode has not confirmed this accepted submission yet.");
+          }
+          if (match.timestamp > 0 && Date.now() - match.timestamp > 60 * 60 * 1000) {
+            throw new Error("LeetCode rejected a stale submission event.");
+          }
+          return { id: incomingId, slug: match.slug || incomingSlug || undefined };
+        }),
+      );
+    }
+
+    if (msg.type === "cses-accepted") {
+      const resultId = textValue(msg.resultId, "CSES result id", 32);
+      const taskId = textValue(msg.taskId, "CSES task id", 32);
+      if (
+        (!resultId && !taskId) ||
+        (resultId && !/^\d+$/.test(resultId)) ||
+        (taskId && !/^\d+$/.test(taskId))
+      ) {
+        return sendResponse({ ok: false, error: "Invalid CSES submission id." });
+      }
+      const name = textValue(msg.name, "CSES problem name");
+      return sendResponse(
+        await handleAccepted("cses", "CSES", async () => ({
+          id: resultId || taskId,
+          resultId: resultId || undefined,
+          taskId: taskId || undefined,
+          name: name || undefined,
+        })),
+      );
+    }
+
+    if (msg.type === "codechef-accepted") {
+      const submissionId = textValue(msg.submissionId, "CodeChef submission id", 32);
+      if (!/^\d+$/.test(submissionId)) {
+        return sendResponse({ ok: false, error: "Invalid CodeChef submission id." });
+      }
+      const problemCode = textValue(msg.problemCode, "CodeChef problem code", 80);
+      return sendResponse(
+        await handleAccepted("codechef", "CodeChef", async () => ({
+          id: submissionId,
+          problemCode: problemCode || undefined,
+        })),
+      );
+    }
+
+    if (msg.type === "gfg-accepted") {
+      const slug = textValue(msg.slug, "GeeksforGeeks problem slug", 180);
+      if (!/^[A-Za-z0-9_-]+$/.test(slug)) {
+        return sendResponse({ ok: false, error: "Invalid GeeksforGeeks problem slug." });
+      }
+      const title = textValue(msg.title, "GeeksforGeeks problem title");
+      const difficulty = textValue(msg.difficulty, "GeeksforGeeks difficulty", 32);
+      const language = textValue(msg.language, "GeeksforGeeks language", 100);
+      const suppliedUrl = textValue(msg.url, "GeeksforGeeks problem URL", 500);
+      let problemUrl = "";
+      if (suppliedUrl) {
+        try {
+          const parsed = new URL(suppliedUrl);
+          if (
+            parsed.protocol !== "https:" ||
+            !hostMatches(parsed.hostname, ["geeksforgeeks.org"])
+          ) {
+            throw new Error();
+          }
+          problemUrl = parsed.toString();
+        } catch {
+          return sendResponse({ ok: false, error: "Invalid GeeksforGeeks problem URL." });
+        }
+      }
+      return sendResponse(
+        await handleAccepted("gfg", "GeeksforGeeks", async (config) => {
+          let source = await gfg.readEditorFromTab(sender.tab.id);
+          if (!source || !source.trim()) {
+            source = await gfg.fetchSource({
+              slug,
+              title,
+              difficulty,
+              language,
+              url: problemUrl,
+              handle: config.gfgHandle,
+            });
+          }
+          return {
+            id: gfg.submissionIdFor(slug, source),
+            slug,
+            title: title || undefined,
+            difficulty: difficulty || undefined,
+            language: language || undefined,
+            url: problemUrl || undefined,
+            source,
+          };
+        }),
+      );
+    }
+
+    if (msg.type === "status") {
+      const [config, session, lastSync] = await Promise.all([
+        store.getConfig(),
+        store.get(store.KEYS.session, null),
+        store.get(store.KEYS.lastSync, null),
+      ]);
+      return sendResponse({ config: publicConfig(config), session, lastSync });
+    }
+
+    if (msg.type === "check-session") {
+      const config = await store.getConfig();
+      if (!config) {
+        await store.setSession({});
+        return sendResponse({ ok: true });
+      }
+      const checkers = {
+        codeforces: cf.checkSession,
+        leetcode: lc.checkSession,
+        cses: cses.checkSession,
+        codechef: codechef.checkSession,
+        gfg: gfg.checkSession,
+      };
+      const session = {};
+      await Promise.all(
+        enabledPlatforms(config).map(async (platformName) => {
+          const check = checkers[platformName];
+          const key = sessionKeyFor(platformName);
+          if (!check || !key) return;
+          try {
+            session[key] = (await check()).ok;
+          } catch {
+            // A flaky probe must not raise a false "signed out" banner.
+          }
+        }),
+      );
+      await store.setSession(session);
+      return sendResponse({ ok: Object.values(session).every((value) => value !== false) });
+    }
+
+    if (msg.type === "save-config") {
+      if (!isRecord(msg.payload)) {
+        return sendResponse({ ok: false, error: "Invalid settings." });
+      }
+      const previous = await store.getConfig();
+      const handle = textValue(msg.payload.handle, "Codeforces handle", 64);
+      const codechefHandle = textValue(msg.payload.codechefHandle, "CodeChef username", 64);
+      const gfgHandle = textValue(msg.payload.gfgHandle, "GeeksforGeeks username", 64);
+      const repo = textValue(msg.payload.repo, "repository name", 100);
+      const topicPriority = multilineValue(
+        msg.payload.topicPriority,
+        "LeetCode topic priority",
+        2000,
+      );
+      const platforms = isRecord(msg.payload.platforms) ? msg.payload.platforms : {};
+      for (const name of ["codeforces", "leetcode", "cses", "codechef", "gfg"]) {
+        if (Object.hasOwn(platforms, name) && typeof platforms[name] !== "boolean") {
+          return sendResponse({ ok: false, error: "Invalid platform settings." });
+        }
+      }
+      const enabled = {
+        codeforces: platforms.codeforces !== false,
+        leetcode: platforms.leetcode !== false,
+        cses: platforms.cses !== false,
+        codechef: platforms.codechef !== false,
+        gfg: platforms.gfg !== false,
+      };
+      try {
+        const repoError = gh.validateRepoName(repo);
+        if (repoError) throw new Error(repoError);
+        for (const [value, label] of [
+          [handle, "Codeforces handle"],
+          [codechefHandle, "CodeChef username"],
+          [gfgHandle, "GeeksforGeeks username"],
+        ]) {
+          if (value && !/^[A-Za-z0-9_.-]+$/.test(value)) throw new Error(`Invalid ${label}.`);
+        }
+        if (!Object.values(enabled).some(Boolean)) throw new Error("Enable at least one platform.");
+        if (enabled.codeforces && !handle) throw new Error("Enter your Codeforces handle.");
+        if (enabled.codechef && !codechefHandle) throw new Error("Enter your CodeChef username.");
+        if (enabled.gfg && !gfgHandle) throw new Error("Enter your GeeksforGeeks username.");
+
+        let token = "";
+        let owner = "";
+        if (msg.payload.connect === true) {
+          const result = await oauth.connect();
+          token = result.token;
+          owner = result.owner;
+        } else {
+          token = previous?.token || "";
+          owner = previous?.owner || "";
+          if (!token) {
+            return sendResponse({ ok: false, error: "Connect GitHub first." });
+          }
+          const user = await gh.verifyToken(token);
+          owner = user.login;
+        }
+
+        const checks = [];
+        if (enabled.codeforces) {
+          checks.push(
+            cf.handleExists(handle || "").then((ok) => {
+              if (!ok) throw new Error("Codeforces handle not found");
+            }),
+          );
+        }
+        if (enabled.codechef && codechefHandle) {
+          checks.push(
+            codechef.handleExists(codechefHandle).then((ok) => {
+              if (!ok) throw new Error("CodeChef username not found");
+            }),
+          );
+        }
+        if (enabled.gfg && gfgHandle) {
+          checks.push(
+            gfg.handleExists(gfgHandle).then((ok) => {
+              if (!ok) throw new Error("GeeksforGeeks username not found");
+            }),
+          );
+        }
+        await Promise.all(checks);
+        await gh.ensureRepo(token, owner, repo);
+        const config = {
+          handle: handle || "",
+          codechefHandle: codechefHandle || "",
+          gfgHandle: gfgHandle || "",
+          token,
+          repo,
+          owner,
+          platforms: enabled,
+          topicPriority: topicPriority || "",
+          setupComplete: true,
+        };
+        const repoChanged = previous?.repo !== repo || previous?.owner !== owner;
+        if (repoChanged) await store.clearRepositoryState();
+        else await store.clearWorkState();
+        await store.setConfig(config);
+        await store.set(store.KEYS.lastSync, null);
+        await installLiveDetectors();
+
+        const session = {};
+        for (const platformName of enabledPlatforms(config)) {
+          const key = sessionKeyFor(platformName);
+          if (key) session[key] = true;
+        }
+        await store.setSession(session);
+        return sendResponse({ ok: true, owner });
+      } catch (err) {
+        return sendResponse({ ok: false, error: errorText(err, "Could not save settings.") });
+      }
+    }
+
+    if (msg.type === "github-disconnect") {
+      await oauth.disconnect();
+      return sendResponse({ ok: true });
+    }
+
+    if (msg.type === "reset") {
+      await Promise.all([chrome.storage.local.clear(), chrome.storage.session.clear()]);
+      await chrome.action.setBadgeText({ text: "" });
+      return sendResponse({ ok: true });
+    }
+
+    return sendResponse({ ok: false });
+  })().catch((error) => sendResponse({ ok: false, error: errorText(error) }));
+  return true;
+});

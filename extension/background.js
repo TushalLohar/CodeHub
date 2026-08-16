@@ -16,7 +16,7 @@ const GITHUB_AUTH_ALARM = "github-auth-health";
 const GITHUB_AUTH_NOTICE_ID = "codehub-github-auth-required";
 const GITHUB_AUTH_NOTICE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const PROJECT_REPO_OWNER = "TushalLohar";
-const PROJECT_REPO_NAME = "CodeHub";
+const PROJECT_REPO_NAME = "SolveBase";
 const TEXT_ENCODER = new TextEncoder();
 
 const PLATFORM_MESSAGE_HOSTS = {
@@ -117,9 +117,9 @@ async function notifyGithubAuthRequired() {
   await chrome.notifications.create(GITHUB_AUTH_NOTICE_ID, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("icon.png"),
-    title: "CodeHub needs GitHub access",
+    title: "SolveBase needs GitHub access",
     message:
-      "GitHub authorization is no longer valid. Open CodeHub and reconnect to resume syncing.",
+      "GitHub authorization is no longer valid. Open SolveBase and reconnect to resume syncing.",
     priority: 2,
   });
 }
@@ -627,7 +627,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "star-project-repo") {
       const config = await store.getConfig();
       if (!config?.token) {
-        return sendResponse({ ok: false, error: "Connect GitHub before starring CodeHub." });
+        return sendResponse({ ok: false, error: "Connect GitHub before starring SolveBase." });
       }
       try {
         await gh.starRepository(config.token, PROJECT_REPO_OWNER, PROJECT_REPO_NAME);
@@ -637,7 +637,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (isGithubUnauthorized(error)) await invalidateGithubAuth();
         return sendResponse({
           ok: false,
-          error: errorText(error, "Could not star CodeHub on GitHub."),
+          error: errorText(error, "Could not star SolveBase on GitHub."),
         });
       }
     }

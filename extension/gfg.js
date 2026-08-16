@@ -174,7 +174,7 @@ export async function checkSession() {
     }
   }
 
-  return { ok: false, error: "Sign in to GeeksforGeeks so CodeHub can read your solutions" };
+  return { ok: false, error: "Sign in to GeeksforGeeks so SolveBase can read your solutions" };
 }
 
 // Reads the editor's own model instead of the rendered DOM. Monaco virtualizes:

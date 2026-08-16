@@ -1,6 +1,6 @@
-# CodeHub
+# SolveBase
 
-CodeHub is a browser extension and companion website for syncing accepted coding solutions to GitHub.
+SolveBase is a browser extension and companion website for syncing accepted coding solutions to GitHub.
 
 ## Development
 
@@ -30,12 +30,12 @@ The three Vercel functions under `api/oauth/github/` are used only while a user 
 
 Source code and normal GitHub synchronization requests do not pass through this backend.
 The extension keeps the resulting token only in trusted extension storage; it is never written to
-the repository, a page-controlled storage area, or a CodeHub server log.
+the repository, a page-controlled storage area, or a SolveBase server log.
 
-When an existing solutions repository is connected, CodeHub rebuilds its local solution index from
+When an existing solutions repository is connected, SolveBase rebuilds its local solution index from
 the repository files before updating the summary. It adopts repositories with recognized solution
 folders while rejecting unrelated non-empty repositories. Existing README content is preserved
-outside the marked CodeHub summary block. Supported layouts include the normal platform folders and
+outside the marked SolveBase summary block. Supported layouts include the normal platform folders and
 older Codeforces repositories with rating folders at the repository root.
 
 ### Vercel Setup

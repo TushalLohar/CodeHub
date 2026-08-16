@@ -88,13 +88,13 @@ function renderStarState(starred, connected) {
   button.setAttribute("aria-pressed", String(starred));
   button.setAttribute(
     "aria-label",
-    starred ? "CodeHub is starred on GitHub" : "Star CodeHub on GitHub",
+    starred ? "SolveBase is starred on GitHub" : "Star SolveBase on GitHub",
   );
   button.title = starred
-    ? "CodeHub is starred"
+    ? "SolveBase is starred"
     : connected
-      ? "Star CodeHub"
-      : "Connect GitHub to star CodeHub";
+      ? "Star SolveBase"
+      : "Connect GitHub to star SolveBase";
 }
 
 function render(state) {
@@ -336,16 +336,16 @@ $("starRepo").addEventListener("click", async () => {
   if (button.disabled) return;
   button.disabled = true;
   button.classList.add("is-loading");
-  button.title = "Starring CodeHub...";
+  button.title = "Starring SolveBase...";
   try {
     const result = await send({ type: "star-project-repo" });
     if (!result?.ok || result.starred !== true) {
-      throw new Error(result?.error || "Could not star CodeHub on GitHub.");
+      throw new Error(result?.error || "Could not star SolveBase on GitHub.");
     }
     renderStarState(true, true);
   } catch (error) {
     renderStarState(false, true);
-    alert(error instanceof Error ? error.message : "Could not star CodeHub on GitHub.");
+    alert(error instanceof Error ? error.message : "Could not star SolveBase on GitHub.");
   }
 });
 
@@ -387,7 +387,7 @@ $("disconnectGithub").addEventListener("click", async () => {
 $("reset").addEventListener("click", async () => {
   if (
     !confirm(
-      "Reset CodeHub? This removes the GitHub connection, settings, and local cache. GitHub files stay untouched.",
+      "Reset SolveBase? This removes the GitHub connection, settings, and local cache. GitHub files stay untouched.",
     )
   )
     return;

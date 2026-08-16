@@ -11,6 +11,8 @@ Object.assign(globalThis, {
 const { buildReadme, ensureRepo, indexRepositoryFiles, mergeReadme } =
   await import("../extension/github.js");
 
+type SyncedIndex = Record<string, { folder?: string; path?: string }>;
+
 const synced = indexRepositoryFiles([
   { type: "blob", path: "codeforces/1400/573A - Bear and Poker.cpp" },
   { type: "blob", path: "1400/580A - Kefa and First Steps.py" },
@@ -20,12 +22,12 @@ const synced = indexRepositoryFiles([
   { type: "blob", path: "geeksforgeeks/Medium/Subset Sum.cpp" },
   { type: "blob", path: "codeforces/1400/notes.md" },
   { type: "tree", path: "codeforces/1400" },
-]);
+]) as unknown as SyncedIndex;
 
 assert.equal(Object.keys(synced).length, 6);
-assert.equal(synced["codeforces:573A"].folder, "1400");
-assert.equal(synced["codeforces:580A"].path, "1400/580A - Kefa and First Steps.py");
-assert.equal(synced["leetcode:198"].folder, "dynamic-programming");
+assert.equal(synced["codeforces:573A"]?.folder, "1400");
+assert.equal(synced["codeforces:580A"]?.path, "1400/580A - Kefa and First Steps.py");
+assert.equal(synced["leetcode:198"]?.folder, "dynamic-programming");
 
 const generated = buildReadme(synced, "tourist");
 assert.match(generated, /\*\*Total solved: 6\*\*/);
@@ -77,10 +79,13 @@ globalThis.fetch = (async (input: string | URL | Request) => {
   throw new Error(`Unexpected GitHub request: ${url}`);
 }) as typeof fetch;
 
-const adopted = await ensureRepo("token", "octocat", "solutions");
+const adopted = (await ensureRepo("token", "octocat", "solutions")) as {
+  adopted: boolean;
+  synced: SyncedIndex;
+};
 assert.equal(adopted.adopted, true);
 assert.equal(Object.keys(adopted.synced).length, 1);
-assert.equal(adopted.synced["codeforces:4A"].folder, "900");
+assert.equal(adopted.synced["codeforces:4A"]?.folder, "900");
 assert.equal(requests.length, 4);
 
 process.stdout.write("Repository state recovery test: ok\n");

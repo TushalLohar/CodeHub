@@ -71,14 +71,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "CodeHub" },
+      { title: "SolveBase" },
       { name: "description", content: "Sync accepted coding solutions to GitHub." },
-      { name: "author", content: "CodeHub" },
+      { name: "author", content: "SolveBase" },
       { name: "robots", content: "index, follow" },
-      { property: "og:title", content: "CodeHub" },
+      { property: "og:title", content: "SolveBase" },
       { property: "og:description", content: "Sync accepted coding solutions to GitHub." },
       { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "CodeHub" },
+      { property: "og:site_name", content: "SolveBase" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
@@ -86,7 +86,7 @@ export const Route = createRootRoute({
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", type: "image/png", href: "/codehub-brand.png" },
+      { rel: "icon", type: "image/png", href: "/solvebase-brand.png" },
     ],
   }),
 

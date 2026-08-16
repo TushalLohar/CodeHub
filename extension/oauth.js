@@ -30,7 +30,7 @@ async function exchangeCode(code, verifier) {
   try {
     data = await response.json();
   } catch {
-    throw new Error("CodeHub OAuth returned an invalid response.");
+    throw new Error("SolveBase OAuth returned an invalid response.");
   }
   if (!response.ok || !data?.token) {
     throw new Error(
@@ -59,7 +59,7 @@ export async function connect() {
     callback.origin !== expectedRedirect.origin ||
     callback.pathname !== expectedRedirect.pathname
   ) {
-    throw new Error("GitHub returned to an unexpected CodeHub callback.");
+    throw new Error("GitHub returned to an unexpected SolveBase callback.");
   }
   const error = callback.searchParams.get("error");
   if (error) throw new Error("GitHub authorization was cancelled or failed.");
@@ -74,7 +74,7 @@ export async function connect() {
 }
 
 // Forget the GitHub connection locally. The user can revoke the OAuth grant
-// from GitHub settings; no token is sent to a CodeHub server during disconnect.
+// from GitHub settings; no token is sent to a SolveBase server during disconnect.
 export async function disconnect() {
   const config = await store.getConfig();
   if (!config) return;

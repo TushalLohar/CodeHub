@@ -20,28 +20,28 @@ const SITE_URL = "https://codehub-oauth.vercel.app";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "CodeHub — Live CP Solves to GitHub" },
+      { title: "SolveBase — Live CP Solves to GitHub" },
       {
         name: "description",
         content:
-          "CodeHub is a lightweight Chrome extension that automatically saves your accepted Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks solutions to GitHub, organized cleanly by rating, topic, and difficulty, with a self-updating summary.",
+          "SolveBase is a lightweight Chrome extension that automatically saves your accepted Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks solutions to GitHub, organized cleanly by rating, topic, and difficulty, with a self-updating summary.",
       },
       {
         property: "og:title",
-        content: "CodeHub — Codeforces, LeetCode, CSES, CodeChef & GFG to GitHub",
+        content: "SolveBase — Codeforces, LeetCode, CSES, CodeChef & GFG to GitHub",
       },
       {
         property: "og:description",
         content:
-          "Keep solving. CodeHub files every accepted solution into the right folder on GitHub automatically.",
+          "Keep solving. SolveBase files every accepted solution into the right folder on GitHub automatically.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: SITE_URL },
-      { property: "og:site_name", content: "CodeHub" },
+      { property: "og:site_name", content: "SolveBase" },
       { property: "og:image", content: `${SITE_URL}/og-image.png` },
-      { property: "og:image:alt", content: "CodeHub live coding solution sync" },
+      { property: "og:image:alt", content: "SolveBase live coding solution sync" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "CodeHub — Live CP Solves to GitHub" },
+      { name: "twitter:title", content: "SolveBase — Live CP Solves to GitHub" },
       {
         name: "twitter:description",
         content: "Automatically organize accepted competitive-programming solutions in GitHub.",
@@ -57,7 +57,7 @@ export const Route = createFileRoute("/")({
           "@graph": [
             {
               "@type": "SoftwareApplication",
-              name: "CodeHub",
+              name: "SolveBase",
               applicationCategory: "DeveloperApplication",
               operatingSystem: "Chrome, Edge, Brave, Arc",
               description:
@@ -70,12 +70,12 @@ export const Route = createFileRoute("/")({
             },
             {
               "@type": "Organization",
-              name: "CodeHub",
+              name: "SolveBase",
               url: SITE_URL,
-              logo: `${SITE_URL}/codehub-brand.png`,
+              logo: `${SITE_URL}/solvebase-brand.png`,
               sameAs: ["https://github.com/TushalLohar"],
             },
-            { "@type": "WebSite", name: "CodeHub", url: SITE_URL },
+            { "@type": "WebSite", name: "SolveBase", url: SITE_URL },
             {
               "@type": "FAQPage",
               mainEntity: FAQS.map((item) => ({
@@ -282,28 +282,28 @@ const FEATURES = [
 
 const FAQS = [
   {
-    question: "What does CodeHub do?",
+    question: "What does SolveBase do?",
     answer:
-      "CodeHub detects newly accepted coding submissions and saves the source code to a GitHub repository using consistent platform-specific folders.",
+      "SolveBase detects newly accepted coding submissions and saves the source code to a GitHub repository using consistent platform-specific folders.",
   },
   {
-    question: "Which coding platforms does CodeHub support?",
-    answer: "CodeHub supports Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks.",
+    question: "Which coding platforms does SolveBase support?",
+    answer: "SolveBase supports Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks.",
   },
   {
-    question: "Does CodeHub upload source code to its own server?",
+    question: "Does SolveBase upload source code to its own server?",
     answer:
-      "No. The extension sends repository updates directly to GitHub. The CodeHub OAuth service handles only the short-lived GitHub authorization exchange.",
+      "No. The extension sends repository updates directly to GitHub. The SolveBase OAuth service handles only the short-lived GitHub authorization exchange.",
   },
   {
-    question: "Can CodeHub use an existing GitHub repository?",
+    question: "Can SolveBase use an existing GitHub repository?",
     answer:
-      "Yes. CodeHub can inspect compatible solution folders in an existing repository and preserve content outside its managed README summary block.",
+      "Yes. SolveBase can inspect compatible solution folders in an existing repository and preserve content outside its managed README summary block.",
   },
   {
-    question: "Does CodeHub import every old solved problem automatically?",
+    question: "Does SolveBase import every old solved problem automatically?",
     answer:
-      "No. CodeHub focuses on live accepted submissions. Existing compatible files are indexed when you connect a repository, but old platform submissions are not scraped in bulk.",
+      "No. SolveBase focuses on live accepted submissions. Existing compatible files are indexed when you connect a repository, but old platform submissions are not scraped in bulk.",
   },
 ];
 
@@ -324,12 +324,12 @@ function Home() {
             <span className="font-mono text-xs font-semibold text-primary tracking-widest uppercase">
               Manifest V3 Extension
             </span>
-            <div className="font-mono text-sm font-bold text-foreground">CodeHub v1.0.1</div>
+            <div className="font-mono text-sm font-bold text-foreground">SolveBase v1.0.1</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <a
-            href="https://github.com/TushalLohar/CodeHub"
+            href="https://github.com/TushalLohar/SolveBase"
             target="_blank"
             rel="noreferrer"
             className="glass-card glass-card-hover inline-flex items-center gap-2 rounded-lg px-4 py-2 font-mono text-xs font-semibold text-foreground transition-all cursor-pointer"
@@ -365,7 +365,7 @@ function Home() {
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-          Keep solving without friction. CodeHub detects your accepted submissions on{" "}
+          Keep solving without friction. SolveBase detects your accepted submissions on{" "}
           <strong className="text-foreground">Codeforces</strong>,{" "}
           <strong className="text-foreground">LeetCode</strong>,{" "}
           <strong className="text-foreground">CSES</strong>,{" "}
@@ -564,8 +564,8 @@ function Home() {
                   <strong className="text-foreground">Connect GitHub</strong>.
                 </span>
                 <p className="mt-1.5 text-xs text-muted-foreground/80">
-                  GitHub asks you to authorize CodeHub to manage a solutions repository. Approve it
-                  — no personal access token needed.
+                  GitHub asks you to authorize SolveBase to manage a solutions repository. Approve
+                  it — no personal access token needed.
                 </p>
               </div>
             </li>
@@ -600,7 +600,7 @@ function Home() {
           <li className="flex items-start gap-2">
             <span className="text-primary font-bold">•</span>
             <span>
-              <strong className="text-foreground">Live submissions only:</strong> CodeHub syncs a
+              <strong className="text-foreground">Live submissions only:</strong> SolveBase syncs a
               solution only after it witnesses your submit action and confirms the accepted result.
               It does not import old solves or queue contest submissions for later.
             </span>
@@ -622,7 +622,7 @@ function Home() {
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Clear answers about installation, supported coding platforms, GitHub access, and how
-          CodeHub handles your source code.
+          SolveBase handles your source code.
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           {FAQS.map((item) => (
@@ -634,9 +634,21 @@ function Home() {
         </div>
       </section>
 
-      <footer className="mt-16 border-t border-border pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-muted-foreground">
-        <span>CodeHub — Live CP Solution Syncing</span>
-        <span>Codeforces · LeetCode · CSES · CodeChef · GFG · GitHub</span>
+      <footer className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 font-mono text-xs text-muted-foreground sm:flex-row">
+        <span>SolveBase — Live CP Solution Syncing</span>
+        <nav className="flex flex-wrap items-center justify-center gap-4" aria-label="Footer">
+          <a className="transition-colors hover:text-foreground" href="/privacy">
+            Privacy
+          </a>
+          <a
+            className="transition-colors hover:text-foreground"
+            href="https://github.com/TushalLohar/SolveBase/issues"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Support
+          </a>
+        </nav>
       </footer>
     </main>
   );

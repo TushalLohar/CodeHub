@@ -105,7 +105,7 @@ export async function verifyToken(token) {
   const header = res.headers.get("x-oauth-scopes");
   if (header === null) {
     throw new Error(
-      "That token type is not supported. CodeHub needs its GitHub OAuth authorization to create and update the public solutions repository.",
+      "That token type is not supported. SolveBase needs its GitHub OAuth authorization to create and update the public solutions repository.",
     );
   }
   const scopes = header
@@ -239,7 +239,7 @@ async function repositoryState(token, owner, repo, defaultBranch) {
   if (!response.ok) throw new Error("GitHub could not inspect that repository safely.");
   const payload = await response.json();
   if (payload?.truncated) {
-    throw new Error("That repository is too large for CodeHub to index safely.");
+    throw new Error("That repository is too large for SolveBase to index safely.");
   }
   if (!Array.isArray(payload?.tree)) {
     throw new Error("GitHub returned an invalid repository index.");
@@ -258,7 +258,7 @@ export async function ensureRepo(token, owner, repo) {
       body: JSON.stringify({
         name: repo,
         description:
-          "Codeforces, LeetCode, CSES, CodeChef & GeeksforGeeks solutions, organized cleanly by rating, topic, contest and difficulty. Synced by CodeHub.",
+          "Codeforces, LeetCode, CSES, CodeChef & GeeksforGeeks solutions, organized cleanly by rating, topic, contest and difficulty. Synced by SolveBase.",
         auto_init: true,
         private: false,
       }),
@@ -295,7 +295,7 @@ export async function ensureRepo(token, owner, repo) {
       return { created: false, adopted: true, synced };
     }
   }
-  // User README content is preserved; CodeHub writes only inside its managed block.
+  // User README content is preserved; SolveBase writes only inside its managed block.
   const starters = new Set(["license", "license.md", ".gitignore", "readme", "readme.md"]);
   const onlyBoilerplate = entries.every(
     (entry) =>
@@ -307,7 +307,7 @@ export async function ensureRepo(token, owner, repo) {
     return { created: false, adopted: true, synced };
   }
   throw new Error(
-    "That repository has no CodeHub-compatible solution folders. Use an empty repository or organize files under codeforces, leetcode, cses, codechef, or geeksforgeeks.",
+    "That repository has no SolveBase-compatible solution folders. Use an empty repository or organize files under codeforces, leetcode, cses, codechef, or geeksforgeeks.",
   );
 }
 
@@ -341,7 +341,7 @@ function throwHttpError(res, action) {
   }
   if (res.status === 401 || res.status === 403) {
     const err = new Error(
-      `GitHub refused the ${action} (${res.status}) — reconnect CodeHub and check write access to this public repository`,
+      `GitHub refused the ${action} (${res.status}) — reconnect SolveBase and check write access to this public repository`,
     );
     err.status = res.status;
     err.code = res.status === 401 ? "github-auth" : "github-permission";
@@ -578,7 +578,7 @@ export function buildReadme(synced, handle) {
   return `${README_MARKER}
 # Competitive Programming Solutions
 
-Synced automatically by CodeHub.
+Synced automatically by SolveBase.
 
 **Total solved: ${total}**
 

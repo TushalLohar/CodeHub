@@ -90,7 +90,7 @@ async function writeOnce(config, platformName, submission) {
   const syncedKey = `${platformName}:${meta.key || meta.title || meta.id}`;
   const previous = await previousSolutionFor(syncedKey);
   // Imported solutions keep the user's existing folder and filename. Once a
-  // matching problem is solved again, CodeHub updates that file in place.
+  // matching problem is solved again, SolveBase updates that file in place.
   const preserveImportedPath = Boolean(previous?.imported && previous?.path);
   const targetPath = preserveImportedPath ? previous.path : meta.path;
   const targetFolder = preserveImportedPath ? previous.folder || meta.folder : meta.folder;

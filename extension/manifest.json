@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "CodeHub \u2014 Live sync your solutions to GitHub",
+  "name": "SolveBase - Solves to GitHub",
   "version": "1.0.1",
   "minimum_chrome_version": "111",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5YaTwQBW/1x21DmqBVG7LEoWs8aW8zCnVvbisy9Jw5WaXkBkHQzXsXd8RooKTmcrY5+QX6TXl2My6y386/f4bHCUX4VyCBOw5CkFrMtbLUY+E/maYt38oeEUfLdevwOsDIOnHBW5R+Hzo2OtPZLZNJ3Dnsgt90UxH8S9aRUYq79FnheInUVahXGjVJfGSXGjAPUhbd2S0Sdy81Nv2Yo+bcS4Ol5q9gFVHHVOMQ5gmSKD0QVMoRlyrXBuo/Nz5cmB3ZXndWzfdg6GIgG2vd7jZxgXvKfS89cFqYv4QnAwNZzZqKrHo0z6rY1mit9NTP7cv3mrxCCxGUobtP8UfZFHvwIDAQAB",
-  "description": "Live-syncs newly accepted Codeforces, LeetCode, CSES, CodeChef and GeeksforGeeks solutions to GitHub.",
+  "description": "Automatically syncs accepted Codeforces, LeetCode, CSES, CodeChef and GeeksforGeeks solutions to GitHub.",
   "permissions": ["storage", "cookies", "scripting", "identity", "alarms", "notifications"],
   "host_permissions": [
     "https://codeforces.com/*",
@@ -26,7 +26,11 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "CodeHub"
+    "default_title": "SolveBase",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
   },
   "content_scripts": [
     {
@@ -69,7 +73,9 @@
     }
   ],
   "icons": {
-    "48": "icon.png",
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
     "128": "icon.png"
   }
 }

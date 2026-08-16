@@ -41,7 +41,9 @@ const digest = crypto
   .digest()
   .subarray(0, 16);
 const alphabet = "abcdefghijklmnop";
-const extensionId = [...digest].map((byte) => alphabet[byte >> 4] + alphabet[byte & 15]).join("");
+const extensionId = [...digest]
+  .map((byte) => (alphabet[byte >> 4] ?? "") + (alphabet[byte & 15] ?? ""))
+  .join("");
 
 Object.assign(process.env, {
   GITHUB_CLIENT_ID: "test-client-id",
@@ -102,10 +104,10 @@ nextResponse = Response.json(
 assert.deepEqual(await github.verifyToken("active-token"), { login: "TushalLohar" });
 
 nextResponse = new Response(null, { status: 204 });
-assert.deepEqual(await github.starRepository("active-token", "TushalLohar", "CodeHub"), {
+assert.deepEqual(await github.starRepository("active-token", "TushalLohar", "SolveBase"), {
   starred: true,
 });
-assert.equal(requestedUrl, "https://api.github.com/user/starred/TushalLohar/CodeHub");
+assert.equal(requestedUrl, "https://api.github.com/user/starred/TushalLohar/SolveBase");
 assert.equal(requestedMethod, "PUT");
 assert.equal(authorization, "Bearer active-token");
 

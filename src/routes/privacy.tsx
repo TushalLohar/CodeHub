@@ -48,6 +48,12 @@ const sections = [
     ],
   },
   {
+    title: "Website analytics",
+    body: [
+      "The SolveBase website uses Vercel Web Analytics to measure aggregate page visits and improve the site. It may process the page path, referring page, browser and device category, and country-level information. It does not access extension settings, GitHub tokens, coding-platform cookies, or solution source code.",
+    ],
+  },
+  {
     title: "Sharing and sale",
     body: [
       "SolveBase does not sell personal data, share data with advertisers, or transfer data for unrelated purposes. Data is sent only to the coding platforms you use, GitHub for the requested repository updates, and the temporary OAuth service required to connect GitHub.",

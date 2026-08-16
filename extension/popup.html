@@ -7,206 +7,275 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="app-container">
+    <svg class="icon-defs" aria-hidden="true">
+      <symbol id="icon-star" viewBox="0 0 24 24">
+        <path
+          d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2Z"
+        />
+      </symbol>
+      <symbol id="icon-external" viewBox="0 0 24 24">
+        <path d="M15 3h6v6" />
+        <path d="M10 14 21 3" />
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      </symbol>
+      <symbol id="icon-logout" viewBox="0 0 24 24">
+        <path d="m10 17 5-5-5-5" />
+        <path d="M15 12H3" />
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      </symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24">
+        <path
+          d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"
+        />
+        <circle cx="12" cy="12" r="3" />
+      </symbol>
+      <symbol id="icon-bug" viewBox="0 0 24 24">
+        <path d="m8 2 1.88 1.88" />
+        <path d="M14.12 3.88 16 2" />
+        <path d="M9 7.13v-1a3 3 0 1 1 6 0v1" />
+        <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6Z" />
+        <path d="M12 20v-9" />
+        <path d="M6.5 9H3" />
+        <path d="M6 13H2" />
+        <path d="M17.5 9H21" />
+        <path d="M18 13h4" />
+      </symbol>
+      <symbol id="icon-lightbulb" viewBox="0 0 24 24">
+        <path d="M9 18h6" />
+        <path d="M10 22h4" />
+        <path
+          d="M15.09 14c.18-.72.66-1.24 1.17-1.75A6 6 0 1 0 7.74 12.25c.48.48.97 1.02 1.17 1.75"
+        />
+      </symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24">
+        <path d="m9 18 6-6-6-6" />
+      </symbol>
+    </svg>
+
+    <div class="app-shell">
       <header class="app-header">
         <div class="brand">
-          <span class="brand-logo">CF<span class="accent-slash">/</span>SYNC</span>
-          <span class="version-chip">v4.1</span>
+          <span class="brand-mark-frame">
+            <img class="brand-mark" src="codehub-brand.png" alt="" />
+          </span>
+          <span class="brand-name">CodeHub</span>
         </div>
-        <div class="status-indicator">
-          <span id="statusDot" class="status-dot"></span>
-          <span id="statusText" class="status-text">Ready</span>
+
+        <div class="header-actions">
+          <div class="connection-status" title="Extension status">
+            <span id="statusDot" class="status-dot"></span>
+            <span id="statusText" class="status-text">Checking</span>
+          </div>
+          <button
+            id="starRepo"
+            type="button"
+            class="header-star icon-button"
+            aria-label="Star CodeHub on GitHub"
+            aria-pressed="false"
+            title="Star CodeHub"
+          >
+            <svg aria-hidden="true"><use href="#icon-star"></use></svg>
+          </button>
         </div>
       </header>
 
-      <div id="banner" class="banner hidden">
-        <div class="banner-icon">⚠️</div>
+      <div id="banner" class="banner hidden" role="alert">
+        <span class="banner-icon" aria-hidden="true">!</span>
         <div class="banner-content">
           <strong id="bannerTitle">Session expired</strong>
           <p id="bannerText">Sign in to your platform to continue syncing.</p>
-          <a id="bannerLink" href="#" target="_blank" rel="noreferrer">Reconnect account →</a>
+          <a id="bannerLink" href="#" target="_blank" rel="noreferrer">Reconnect account</a>
         </div>
       </div>
 
-      <section id="setup" class="panel hidden">
-        <div class="panel-header">
-          <h1>Configure Live Sync</h1>
-          <p class="panel-desc">Connect your handles and GitHub repository.</p>
-        </div>
+      <main class="app-main">
+        <section id="setup" class="panel setup-panel hidden">
+          <div class="section-heading">
+            <div>
+              <h1>Settings</h1>
+              <p>Choose where CodeHub saves your accepted solutions.</p>
+            </div>
+            <button id="cancelEdit" type="button" class="text-button hidden">Cancel</button>
+          </div>
 
-        <div class="form-group">
-          <label for="handle">Codeforces Handle</label>
-          <input id="handle" placeholder="your_handle" autocomplete="off" spellcheck="false" />
-        </div>
+          <div class="form-section">
+            <h2>Platform accounts</h2>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="handle">Codeforces handle</label>
+                <input id="handle" placeholder="tourist" autocomplete="off" spellcheck="false" />
+              </div>
 
-        <div class="form-group">
-          <label for="codechefHandle">CodeChef Username</label>
-          <input
-            id="codechefHandle"
-            placeholder="your_username"
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </div>
+              <div class="form-group">
+                <label for="codechefHandle">CodeChef username</label>
+                <input
+                  id="codechefHandle"
+                  placeholder="username"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
 
-        <div class="form-group">
-          <label for="gfgHandle">GeeksforGeeks Username</label>
-          <input id="gfgHandle" placeholder="your_username" autocomplete="off" spellcheck="false" />
-        </div>
+              <div class="form-group form-group-wide">
+                <label for="gfgHandle">GeeksforGeeks username</label>
+                <input
+                  id="gfgHandle"
+                  placeholder="username"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+            </div>
+          </div>
 
-        <div class="form-group">
-          <label>GitHub</label>
-          <div class="github-connect-row">
-            <span id="githubStatus" class="github-status not-connected">Not connected</span>
-            <button id="githubConnect" type="button" class="btn btn-ghost">
-              <span>Connect GitHub</span>
+          <div class="form-section">
+            <h2>GitHub repository</h2>
+            <div class="github-connect-row">
+              <span id="githubStatus" class="github-status not-connected">Not connected</span>
+              <button id="githubConnect" type="button" class="btn btn-outline">
+                Connect GitHub
+              </button>
+            </div>
+
+            <div class="form-group">
+              <label for="repo">Repository name</label>
+              <input id="repo" value="CP-Solutions" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
+
+          <fieldset class="form-section platform-fieldset">
+            <legend>Active platforms</legend>
+            <div class="platforms-grid">
+              <label class="platform-toggle">
+                <input id="platformCF" type="checkbox" checked />
+                <span class="platform-control">Codeforces<span class="toggle-check">✓</span></span>
+              </label>
+              <label class="platform-toggle">
+                <input id="platformLC" type="checkbox" checked />
+                <span class="platform-control">LeetCode<span class="toggle-check">✓</span></span>
+              </label>
+              <label class="platform-toggle">
+                <input id="platformCSES" type="checkbox" checked />
+                <span class="platform-control">CSES<span class="toggle-check">✓</span></span>
+              </label>
+              <label class="platform-toggle">
+                <input id="platformCodeChef" type="checkbox" checked />
+                <span class="platform-control">CodeChef<span class="toggle-check">✓</span></span>
+              </label>
+              <label class="platform-toggle platform-toggle-wide">
+                <input id="platformGFG" type="checkbox" checked />
+                <span class="platform-control"
+                  >GeeksforGeeks<span class="toggle-check">✓</span></span
+                >
+              </label>
+            </div>
+          </fieldset>
+
+          <p id="setupError" class="error-banner hidden"></p>
+          <div class="setup-actions">
+            <button id="save" class="btn btn-primary">Verify &amp; Save</button>
+            <button id="reset" class="text-button danger-text">Reset extension data</button>
+          </div>
+        </section>
+
+        <section id="status" class="panel status-panel hidden">
+          <div class="github-account-row">
+            <a
+              id="repoLink"
+              class="repo-link"
+              href="#"
+              target="_blank"
+              rel="noreferrer"
+              title="Open repository on GitHub"
+            >
+              <span class="repo-icon-wrap">
+                <img src="icons/github.svg" alt="" />
+              </span>
+              <span id="repoLine" class="repo-name"></span>
+              <svg class="repo-open" aria-hidden="true"><use href="#icon-external"></use></svg>
+            </a>
+            <button id="disconnectGithub" class="btn btn-disconnect">
+              <svg aria-hidden="true"><use href="#icon-logout"></use></svg>
+              <span>Disconnect</span>
             </button>
           </div>
-          <small class="helper-text"
-            >Authorize CodeHub to create and write a public solutions repo. No token to
-            paste.</small
-          >
-        </div>
 
-        <div class="form-group">
-          <label for="repo">Repository Name</label>
-          <input id="repo" value="CP-Solutions" autocomplete="off" spellcheck="false" />
-        </div>
+          <section class="platform-summary" aria-labelledby="activePlatformsTitle">
+            <h2 id="activePlatformsTitle">Active platforms</h2>
+            <div class="active-platforms-row" id="activeBadges"></div>
+          </section>
 
-        <div class="form-group">
-          <label class="group-label">Active Platforms</label>
-          <div class="platforms-grid">
-            <label class="platform-toggle" data-platform="cf">
-              <input id="platformCF" type="checkbox" checked />
-              <span class="toggle-pill cf-pill">
-                <span class="pill-dot"></span>
-                Codeforces
+          <button id="edit" class="settings-row">
+            <span class="action-icon settings-action-icon">
+              <svg aria-hidden="true"><use href="#icon-settings"></use></svg>
+            </span>
+            <strong>Settings</strong>
+            <svg class="action-arrow" aria-hidden="true"><use href="#icon-chevron"></use></svg>
+          </button>
+
+          <div class="feedback-actions">
+            <a
+              href="https://github.com/TushalLohar/CodeHub/issues/new?template=bug_report.yml"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span class="action-icon">
+                <svg aria-hidden="true"><use href="#icon-bug"></use></svg>
               </span>
-            </label>
-            <label class="platform-toggle" data-platform="lc">
-              <input id="platformLC" type="checkbox" checked />
-              <span class="toggle-pill lc-pill">
-                <span class="pill-dot"></span>
-                LeetCode
+              <strong>Report a bug</strong>
+            </a>
+            <a
+              href="https://github.com/TushalLohar/CodeHub/issues/new?template=feature_request.yml"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span class="action-icon">
+                <svg aria-hidden="true"><use href="#icon-lightbulb"></use></svg>
               </span>
-            </label>
-            <label class="platform-toggle" data-platform="cses">
-              <input id="platformCSES" type="checkbox" checked />
-              <span class="toggle-pill cses-pill">
-                <span class="pill-dot"></span>
-                CSES
-              </span>
-            </label>
-            <label class="platform-toggle" data-platform="codechef">
-              <input id="platformCodeChef" type="checkbox" checked />
-              <span class="toggle-pill codechef-pill">
-                <span class="pill-dot"></span>
-                CodeChef
-              </span>
-            </label>
-            <label class="platform-toggle" data-platform="gfg">
-              <input id="platformGFG" type="checkbox" checked />
-              <span class="toggle-pill gfg-pill">
-                <span class="pill-dot"></span>
-                GeeksforGeeks
-              </span>
-            </label>
+              <strong>Suggest a feature</strong>
+            </a>
           </div>
-        </div>
+        </section>
+      </main>
 
-        <div class="form-group">
-          <label for="topicPriority">LeetCode Topic Priority (Optional)</label>
-          <textarea
-            id="topicPriority"
-            rows="2"
-            placeholder="binary-search&#10;dynamic-programming&#10;graph"
-            spellcheck="false"
-          ></textarea>
-          <small class="helper-text">One topic per line. Earlier tags take precedence.</small>
-        </div>
-
-        <button id="save" class="btn btn-primary">
-          <span class="btn-text">Verify &amp; Save</span>
-        </button>
-        <p id="setupError" class="error-banner hidden"></p>
-      </section>
-
-      <section id="status" class="panel hidden">
-        <div class="connected-card">
-          <div class="connected-header">
-            <span class="pulse-indicator"></span>
-            <span class="connected-title">Live Sync Active</span>
-          </div>
+      <footer class="app-footer">
+        <p>
+          Built by
+          <a href="https://github.com/TushalLohar" target="_blank" rel="noreferrer">Tushal Lohar</a>
+        </p>
+        <nav aria-label="Author links">
           <a
-            id="repoLink"
-            class="repo-chip"
-            href="#"
+            class="social-link"
+            href="https://x.com/LoharTushal"
             target="_blank"
             rel="noreferrer"
-            title="Open repository on GitHub"
+            aria-label="Tushal Lohar on X"
+            title="X"
           >
-            <svg class="gh-icon" viewBox="0 0 16 16" width="14" height="14" fill="currentColor">
-              <path
-                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-              />
-            </svg>
-            <span id="repoLine" class="repo-name"></span>
-            <span class="external-arrow">↗</span>
+            <img src="icons/x.svg" alt="" />
           </a>
-          <div id="lastSyncLine" class="last-sync-line hidden"></div>
-          <div class="active-platforms-row" id="activeBadges">
-            <span class="mini-badge cf-mini">CF</span>
-            <span class="mini-badge lc-mini">LC</span>
-            <span class="mini-badge cses-mini">CSES</span>
-            <span class="mini-badge codechef-mini">CC</span>
-            <span class="mini-badge gfg-mini">GFG</span>
-          </div>
-        </div>
-
-        <div class="sync-info-card">
-          <div class="sync-info-header">
-            <span class="sync-sparkle">⚡</span>
-            <div>
-              <h3>Real-Time Live Sync</h3>
-              <p class="sync-subtitle">Automatic commits whenever you solve problems</p>
-            </div>
-          </div>
-          <div class="platform-paths-list">
-            <div class="path-item">
-              <span class="path-badge cf-mini">Codeforces</span>
-              <code>codeforces/&lt;rating&gt;/</code>
-            </div>
-            <div class="path-item">
-              <span class="path-badge lc-mini">LeetCode</span>
-              <code>leetcode/&lt;topic&gt;/</code>
-            </div>
-            <div class="path-item">
-              <span class="path-badge cses-mini">CSES</span>
-              <code>cses/&lt;section&gt;/</code>
-            </div>
-            <div class="path-item">
-              <span class="path-badge codechef-mini">CodeChef</span>
-              <code>codechef/&lt;rating&gt;/</code>
-            </div>
-            <div class="path-item">
-              <span class="path-badge gfg-mini">GeeksforGeeks</span>
-              <code>geeksforgeeks/&lt;difficulty&gt;/</code>
-            </div>
-          </div>
-        </div>
-
-        <div class="footer-actions">
-          <button id="edit" class="btn btn-secondary">
-            <span>⚙️ Edit Settings</span>
-          </button>
-          <button id="disconnectGithub" class="btn btn-danger-link">
-            <span>Disconnect GitHub</span>
-          </button>
-          <button id="reset" class="btn btn-danger-link">
-            <span>Reset Data</span>
-          </button>
-        </div>
-      </section>
+          <a
+            class="social-link"
+            href="https://github.com/TushalLohar"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Tushal Lohar on GitHub"
+            title="GitHub"
+          >
+            <img src="icons/github.svg" alt="" />
+          </a>
+          <a
+            class="social-link"
+            href="https://www.linkedin.com/in/tushal-lohar/"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Tushal Lohar on LinkedIn"
+            title="LinkedIn"
+          >
+            <img src="icons/linkedin.svg" alt="" />
+          </a>
+        </nav>
+      </footer>
     </div>
 
     <script src="popup.js"></script>

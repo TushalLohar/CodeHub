@@ -11,6 +11,8 @@ export const KEYS = {
   session: "session",
   processed: "processed",
   lastSync: "lastSync",
+  githubAuthNoticeAt: "githubAuthNoticeAt",
+  projectRepoStarred: "projectRepoStarred",
   schemaVersion: "schemaVersion",
 };
 
@@ -51,9 +53,11 @@ export async function setLastSync(record) {
 export async function setSession(session) {
   await accessReady;
   await set(KEYS.session, { checkedAt: Date.now(), ...session });
-  const anyBad = Object.entries(session).some(
-    ([key, value]) => key.endsWith("Ok") && value === false,
-  );
+  const config = await getConfig();
+  const githubBad = config?.githubAuthInvalid === true;
+  const anyBad =
+    githubBad ||
+    Object.entries(session).some(([key, value]) => key.endsWith("Ok") && value === false);
   await chrome.action.setBadgeText({ text: anyBad ? "!" : "" });
   if (anyBad) await chrome.action.setBadgeBackgroundColor({ color: "#e5533d" });
 }

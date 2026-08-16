@@ -3,6 +3,50 @@ import * as limiter from "./ratelimit.js";
 const API = "https://api.github.com";
 const REQUEST_TIMEOUT = 30000;
 const README_MARKER = "<!-- cf-sync -->";
+const README_END_MARKER = "<!-- /cf-sync -->";
+
+const PLATFORM_ROOTS = {
+  codeforces: "codeforces",
+  leetcode: "leetcode",
+  cses: "cses",
+  codechef: "codechef",
+  geeksforgeeks: "gfg",
+  gfg: "gfg",
+};
+
+const SOURCE_EXTENSIONS = new Set([
+  "c",
+  "cc",
+  "cpp",
+  "cs",
+  "cxx",
+  "d",
+  "dart",
+  "erl",
+  "ex",
+  "go",
+  "hs",
+  "java",
+  "js",
+  "kt",
+  "lua",
+  "m",
+  "ml",
+  "nim",
+  "pas",
+  "php",
+  "pl",
+  "py",
+  "rb",
+  "rkt",
+  "rs",
+  "scala",
+  "sh",
+  "sql",
+  "swift",
+  "ts",
+  "txt",
+]);
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -50,7 +94,12 @@ async function gh(token, path, options = {}) {
 
 export async function verifyToken(token) {
   const res = await gh(token, "/user");
-  if (!res.ok) throw new Error(`GitHub token rejected (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(`GitHub token rejected (${res.status})`);
+    error.status = res.status;
+    error.code = res.status === 401 ? "github-auth" : "github-permission";
+    throw error;
+  }
   const user = await res.json();
 
   const header = res.headers.get("x-oauth-scopes");
@@ -70,6 +119,18 @@ export async function verifyToken(token) {
     throw new Error("GitHub returned an invalid account identity");
   }
   return { login: user.login };
+}
+
+export async function starRepository(token, owner, repo) {
+  const res = await gh(
+    token,
+    `/user/starred/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    {
+      method: "PUT",
+    },
+  );
+  if (!res.ok) throwHttpError(res, "star repository");
+  return { starred: true };
 }
 
 function b64(text) {
@@ -96,6 +157,96 @@ export function validateRepoName(repo) {
   return null;
 }
 
+function importedProblemKey(platform, stem, path) {
+  const separator = stem.indexOf(" - ");
+  if (["codeforces", "cses", "codechef"].includes(platform) && separator > 0) {
+    return stem.slice(0, separator).trim();
+  }
+  if (platform === "leetcode") {
+    const number = stem.match(/^(\d+)-/)?.[1];
+    if (number) return number;
+  }
+  if (platform === "gfg") return stem;
+  return `path:${path}`;
+}
+
+function repositorySolution(path) {
+  const parts = String(path || "")
+    .split("/")
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+
+  const root = parts[0].toLowerCase();
+  let platform = PLATFORM_ROOTS[root] || null;
+  let folder = parts[1] || "";
+
+  // Older Codeforces repositories commonly put rating folders at the root.
+  if (!platform && /^(?:\d{2,5}|unrated)$/i.test(parts[0]) && parts.length >= 2) {
+    platform = "codeforces";
+    folder = parts[0];
+  } else if (platform && parts.length < 3) {
+    return null;
+  }
+  if (!platform || !folder) return null;
+
+  const filename = parts.at(-1) || "";
+  const dot = filename.lastIndexOf(".");
+  if (dot <= 0 || !SOURCE_EXTENSIONS.has(filename.slice(dot + 1).toLowerCase())) return null;
+
+  const stem = filename.slice(0, dot).trim();
+  if (!stem) return null;
+  const separator = stem.indexOf(" - ");
+  const title = separator > 0 ? stem.slice(separator + 3).trim() || stem : stem;
+  const problemKey = importedProblemKey(platform, stem, path);
+  return {
+    key: `${platform}:${problemKey}`,
+    value: {
+      platform,
+      folder,
+      title,
+      path,
+      tags: [],
+      at: 0,
+      imported: true,
+    },
+  };
+}
+
+export function indexRepositoryFiles(tree) {
+  const synced = {};
+  for (const entry of Array.isArray(tree) ? tree : []) {
+    if (entry?.type !== "blob" || typeof entry.path !== "string") continue;
+    const solution = repositorySolution(entry.path);
+    if (!solution) continue;
+
+    let key = solution.key;
+    if (synced[key] && synced[key].path !== solution.value.path) {
+      key = `${key}:path:${solution.value.path}`;
+    }
+    synced[key] = solution.value;
+  }
+  return synced;
+}
+
+async function repositoryState(token, owner, repo, defaultBranch) {
+  if (typeof defaultBranch !== "string" || !defaultBranch || defaultBranch.length > 255) {
+    throw new Error("GitHub returned an invalid default branch.");
+  }
+  const response = await gh(
+    token,
+    `${repositoryPath(owner, repo)}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`,
+  );
+  if (!response.ok) throw new Error("GitHub could not inspect that repository safely.");
+  const payload = await response.json();
+  if (payload?.truncated) {
+    throw new Error("That repository is too large for CodeHub to index safely.");
+  }
+  if (!Array.isArray(payload?.tree)) {
+    throw new Error("GitHub returned an invalid repository index.");
+  }
+  return indexRepositoryFiles(payload.tree);
+}
+
 export async function ensureRepo(token, owner, repo) {
   const invalid = validateRepoName(repo);
   if (invalid) throw new Error(invalid);
@@ -118,17 +269,19 @@ export async function ensureRepo(token, owner, repo) {
     if (!created.ok) {
       throw new Error("GitHub wouldn't accept that name. Try something different.");
     }
-    return { created: true };
+    return { created: true, synced: {} };
   }
   if (!res.ok) throw new Error("GitHub wouldn't accept that name. Try something different.");
+  const repository = await res.json();
 
   const contents = await gh(token, contentsPath(owner, repo));
-  if (contents.status === 404) return { created: false, adopted: true };
+  if (contents.status === 404) return { created: false, adopted: true, synced: {} };
   if (!contents.ok) throw new Error("GitHub could not inspect that repository safely.");
   const entries = await contents.json();
   if (!Array.isArray(entries) || entries.length === 0) {
-    return { created: false, adopted: true };
+    return { created: false, adopted: true, synced: {} };
   }
+  const synced = await repositoryState(token, owner, repo, repository?.default_branch);
   const readme = entries.find(
     (entry) => typeof entry?.name === "string" && entry.name.toLowerCase() === "readme.md",
   );
@@ -139,20 +292,22 @@ export async function ensureRepo(token, owner, repo) {
     }
     const file = await readmeResponse.json();
     if (typeof file.content === "string" && fromB64(file.content).includes(README_MARKER)) {
-      return { created: false, adopted: true };
+      return { created: false, adopted: true, synced };
     }
   }
-  // A README without our marker may contain user content. Never overwrite it.
-  const starters = new Set(["license", "license.md", ".gitignore"]);
+  // User README content is preserved; CodeHub writes only inside its managed block.
+  const starters = new Set(["license", "license.md", ".gitignore", "readme", "readme.md"]);
   const onlyBoilerplate = entries.every(
     (entry) =>
       entry?.type === "file" &&
       typeof entry.name === "string" &&
       starters.has(entry.name.toLowerCase()),
   );
-  if (onlyBoilerplate) return { created: false, adopted: true };
+  if (onlyBoilerplate || Object.keys(synced).length > 0) {
+    return { created: false, adopted: true, synced };
+  }
   throw new Error(
-    "That repository contains existing files. Choose an empty repository or one already managed by CodeHub.",
+    "That repository has no CodeHub-compatible solution folders. Use an empty repository or organize files under codeforces, leetcode, cses, codechef, or geeksforgeeks.",
   );
 }
 
@@ -188,7 +343,8 @@ function throwHttpError(res, action) {
     const err = new Error(
       `GitHub refused the ${action} (${res.status}) — reconnect CodeHub and check write access to this public repository`,
     );
-    err.code = "github-permission";
+    err.status = res.status;
+    err.code = res.status === 401 ? "github-auth" : "github-permission";
     throw err;
   }
   throw new Error(`GitHub ${action} failed (${res.status})`);
@@ -202,8 +358,7 @@ async function getFile(token, owner, repo, path) {
   return { sha: json.sha, content: json.content ? fromB64(json.content) : "" };
 }
 
-export async function putFile(token, owner, repo, path, content, message) {
-  const existing = await getFile(token, owner, repo, path);
+async function putFileWithExisting(token, owner, repo, path, content, message, existing) {
   if (existing && existing.content === content) return { outcome: "unchanged" };
   const res = await gh(token, contentsPath(owner, repo, path), {
     method: "PUT",
@@ -215,6 +370,39 @@ export async function putFile(token, owner, repo, path, content, message) {
   });
   if (!res.ok) throwHttpError(res, "write");
   return { outcome: existing ? "updated" : "created" };
+}
+
+export async function putFile(token, owner, repo, path, content, message) {
+  const existing = await getFile(token, owner, repo, path);
+  return putFileWithExisting(token, owner, repo, path, content, message, existing);
+}
+
+export function mergeReadme(existingContent, generatedContent) {
+  const existing = String(existingContent || "");
+  const generated = String(generatedContent || "").trimEnd();
+  const start = existing.indexOf(README_MARKER);
+  if (start >= 0) {
+    const end = existing.indexOf(README_END_MARKER, start);
+    if (end < 0) return `${generated}\n`;
+    const suffix = existing.slice(end + README_END_MARKER.length);
+    return `${existing.slice(0, start)}${generated}${suffix}`.replace(/\s*$/, "\n");
+  }
+  const preserved = existing.trimEnd();
+  return preserved ? `${preserved}\n\n---\n\n${generated}\n` : `${generated}\n`;
+}
+
+export async function putReadme(token, owner, repo, synced, handle) {
+  const existing = await getFile(token, owner, repo, "README.md");
+  const content = mergeReadme(existing?.content || "", buildReadme(synced, handle));
+  return putFileWithExisting(
+    token,
+    owner,
+    repo,
+    "README.md",
+    content,
+    "Update solutions summary",
+    existing,
+  );
 }
 
 export async function deleteFile(token, owner, repo, path, message) {
@@ -237,6 +425,16 @@ function sortRatings(a, b) {
   return a.localeCompare(b);
 }
 
+function folderHref(items, folder, fallback) {
+  const paths = new Set(
+    items
+      .filter((item) => item.folder === folder && typeof item.path === "string")
+      .map((item) => item.path.split("/").slice(0, -1).join("/"))
+      .filter(Boolean),
+  );
+  return `./${paths.size === 1 ? [...paths][0] : fallback}`;
+}
+
 function buildCodeforcesSection(synced, handle) {
   const items = Object.values(synced).filter((s) => s.platform === "codeforces");
   const byRating = {};
@@ -244,7 +442,9 @@ function buildCodeforcesSection(synced, handle) {
     byRating[item.folder] = (byRating[item.folder] || 0) + 1;
   }
   const order = Object.keys(byRating).sort(sortRatings);
-  const rows = order.map((r) => `| [${r}](./codeforces/${r}) | ${byRating[r]} |`).join("\n");
+  const rows = order
+    .map((r) => `| [${r}](${folderHref(items, r, `codeforces/${r}`)}) | ${byRating[r]} |`)
+    .join("\n");
   return `## Codeforces
 
 Solutions by [${handle || "Codeforces"}](https://codeforces.com/profile/${handle || ""}), organized by difficulty rating.
@@ -264,7 +464,9 @@ function buildLeetcodeSection(synced) {
     byTopic[item.folder] = (byTopic[item.folder] || 0) + 1;
   }
   const order = Object.keys(byTopic).sort((a, b) => a.localeCompare(b));
-  const rows = order.map((t) => `| [${t}](./leetcode/${t}) | ${byTopic[t]} |`).join("\n");
+  const rows = order
+    .map((t) => `| [${t}](${folderHref(items, t, `leetcode/${t}`)}) | ${byTopic[t]} |`)
+    .join("\n");
 
   return `## LeetCode
 
@@ -285,7 +487,9 @@ function buildCsesSection(synced) {
     bySection[item.folder] = (bySection[item.folder] || 0) + 1;
   }
   const order = Object.keys(bySection).sort((a, b) => a.localeCompare(b));
-  const rows = order.map((t) => `| [${t}](./cses/${t}) | ${bySection[t]} |`).join("\n");
+  const rows = order
+    .map((t) => `| [${t}](${folderHref(items, t, `cses/${t}`)}) | ${bySection[t]} |`)
+    .join("\n");
 
   return `## CSES
 
@@ -306,7 +510,9 @@ function buildCodechefSection(synced) {
     byRating[item.folder] = (byRating[item.folder] || 0) + 1;
   }
   const order = Object.keys(byRating).sort(sortRatings);
-  const rows = order.map((r) => `| [${r}](./codechef/${r}) | ${byRating[r]} |`).join("\n");
+  const rows = order
+    .map((r) => `| [${r}](${folderHref(items, r, `codechef/${r}`)}) | ${byRating[r]} |`)
+    .join("\n");
 
   return `## CodeChef
 
@@ -336,7 +542,9 @@ function buildGFGSection(synced) {
     if (bi !== -1) return 1;
     return a.localeCompare(b);
   });
-  const rows = order.map((d) => `| [${d}](./geeksforgeeks/${d}) | ${byDiff[d]} |`).join("\n");
+  const rows = order
+    .map((d) => `| [${d}](${folderHref(items, d, `geeksforgeeks/${d}`)}) | ${byDiff[d]} |`)
+    .join("\n");
 
   return `## GeeksforGeeks
 
@@ -351,12 +559,21 @@ ${rows || "| — | 0 |"}
 }
 
 export function buildReadme(synced, handle) {
-  const total = Object.keys(synced).length;
-  const cf = buildCodeforcesSection(synced, handle);
-  const lc = buildLeetcodeSection(synced);
-  const cses = buildCsesSection(synced);
-  const codechef = buildCodechefSection(synced);
-  const gfg = buildGFGSection(synced);
+  const unique = {};
+  const seenPaths = new Set();
+  for (const [key, item] of Object.entries(synced || {})) {
+    if (!item || typeof item !== "object" || typeof item.platform !== "string") continue;
+    const identity = typeof item.path === "string" && item.path ? item.path : key;
+    if (seenPaths.has(identity)) continue;
+    seenPaths.add(identity);
+    unique[key] = item;
+  }
+  const total = Object.keys(unique).length;
+  const cf = buildCodeforcesSection(unique, handle);
+  const lc = buildLeetcodeSection(unique);
+  const cses = buildCsesSection(unique);
+  const codechef = buildCodechefSection(unique);
+  const gfg = buildGFGSection(unique);
 
   return `${README_MARKER}
 # Competitive Programming Solutions
@@ -376,5 +593,6 @@ ${codechef}
 ${gfg}
 
 _Last updated: ${new Date().toISOString().slice(0, 10)}_
+${README_END_MARKER}
 `;
 }

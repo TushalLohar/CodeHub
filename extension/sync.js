@@ -51,25 +51,12 @@ async function wasProcessed(platform, id) {
 
 async function persistRepositorySummary(config) {
   const synced = await store.get(store.KEYS.synced, {});
-  const content = gh.buildReadme(synced, config.handle);
-  await gh.putFile(
-    config.token,
-    config.owner,
-    config.repo,
-    "README.md",
-    content,
-    "Update solutions summary",
-  );
+  await gh.putReadme(config.token, config.owner, config.repo, synced, config.handle);
 }
 
-// Read a previously synced path for the same problem. Deletion happens only
-// after the replacement file lands, so a failed write can never erase the
-// user's existing solution.
-async function stalePathFor(syncedKey, nextPath) {
+async function previousSolutionFor(syncedKey) {
   const synced = await store.get(store.KEYS.synced, {});
-  const previous = synced[syncedKey];
-  if (!previous || !previous.path || previous.path === nextPath) return null;
-  return previous;
+  return synced[syncedKey] || null;
 }
 
 async function writeOnce(config, platformName, submission) {
@@ -101,13 +88,22 @@ async function writeOnce(config, platformName, submission) {
   // Key by the PROBLEM, not the submission, so a re-submit overwrites instead
   // of inflating the README count.
   const syncedKey = `${platformName}:${meta.key || meta.title || meta.id}`;
-  const stale = await stalePathFor(syncedKey, meta.path);
+  const previous = await previousSolutionFor(syncedKey);
+  // Imported solutions keep the user's existing folder and filename. Once a
+  // matching problem is solved again, CodeHub updates that file in place.
+  const preserveImportedPath = Boolean(previous?.imported && previous?.path);
+  const targetPath = preserveImportedPath ? previous.path : meta.path;
+  const targetFolder = preserveImportedPath ? previous.folder || meta.folder : meta.folder;
+  const stale =
+    previous && !preserveImportedPath && previous.path && previous.path !== targetPath
+      ? previous
+      : null;
 
   const writeResult = await gh.putFile(
     config.token,
     config.owner,
     config.repo,
-    meta.path,
+    targetPath,
     code,
     `Add ${meta.title} (${meta.folder})`,
   );
@@ -125,13 +121,17 @@ async function writeOnce(config, platformName, submission) {
   }
 
   const synced = await store.get(store.KEYS.synced, {});
+  for (const [key, item] of Object.entries(synced)) {
+    if (key !== syncedKey && item?.path === targetPath) delete synced[key];
+  }
   synced[syncedKey] = {
     platform: platformName,
-    folder: meta.folder,
+    folder: targetFolder,
     title: meta.title,
-    path: meta.path,
+    path: targetPath,
     tags: meta.tags || [],
     at: Date.now(),
+    ...(preserveImportedPath ? { imported: true } : {}),
   };
   await store.set(store.KEYS.synced, synced);
 
@@ -161,7 +161,7 @@ export async function processLive(platformName, submission) {
         return await writeOnce(config, platformName, submission);
       } catch (err) {
         lastError = err;
-        if (err && err.code === "auth") {
+        if (err && (err.code === "auth" || err.code === "github-auth")) {
           const session = (await store.get(store.KEYS.session, {})) || {};
           const flag = sessionKeyFor(platformName);
           if (flag) session[flag] = false;

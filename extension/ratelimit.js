@@ -130,9 +130,12 @@ export function reserve(kind) {
 export async function note(res) {
   if (!res) return;
   await load();
-  const remaining = Number(res.headers?.get?.("x-ratelimit-remaining"));
+  const remainingHeader = res.headers?.get?.("x-ratelimit-remaining");
+  const remaining =
+    remainingHeader == null || remainingHeader === "" ? NaN : Number(remainingHeader);
   if (Number.isFinite(remaining)) state.primaryRemaining = remaining;
-  const reset = Number(res.headers?.get?.("x-ratelimit-reset"));
+  const resetHeader = res.headers?.get?.("x-ratelimit-reset");
+  const reset = resetHeader == null || resetHeader === "" ? NaN : Number(resetHeader);
   if (Number.isFinite(reset) && reset > 0) state.primaryReset = reset * 1000;
 
   if (res.status === 403 || res.status === 429) {

@@ -74,9 +74,11 @@ export const Route = createRootRoute({
       { title: "CodeHub" },
       { name: "description", content: "Sync accepted coding solutions to GitHub." },
       { name: "author", content: "CodeHub" },
+      { name: "robots", content: "index, follow" },
       { property: "og:title", content: "CodeHub" },
       { property: "og:description", content: "Sync accepted coding solutions to GitHub." },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "CodeHub" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
@@ -84,7 +86,7 @@ export const Route = createRootRoute({
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "icon", type: "image/png", href: "/codehub-brand.png" },
     ],
   }),
 

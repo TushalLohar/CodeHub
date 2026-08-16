@@ -156,7 +156,12 @@ export async function checkSession() {
   try {
     const html = await getPageHtml("/problemset/");
     const ok = isSessionActive(html);
-    return { ok, error: ok ? null : "Not signed in to CSES" };
+    const profilePath = ok ? html.match(/href=["'](\/user\/\d+)["']/i)?.[1] : null;
+    return {
+      ok,
+      error: ok ? null : "Not signed in to CSES",
+      profileUrl: profilePath ? `${CSES}${profilePath}` : null,
+    };
   } catch (e) {
     return { ok: false, error: e.message };
   }

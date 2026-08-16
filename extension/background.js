@@ -12,6 +12,11 @@ import { enabledPlatforms, sessionKeyFor } from "./platforms.js";
 const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const MAX_FIELD_LENGTH = 256;
 const WITNESS_TTL_MS = 15 * 60 * 1000;
+const GITHUB_AUTH_ALARM = "github-auth-health";
+const GITHUB_AUTH_NOTICE_ID = "codehub-github-auth-required";
+const GITHUB_AUTH_NOTICE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const PROJECT_REPO_OWNER = "TushalLohar";
+const PROJECT_REPO_NAME = "CodeHub";
 const TEXT_ENCODER = new TextEncoder();
 
 const PLATFORM_MESSAGE_HOSTS = {
@@ -28,6 +33,7 @@ const PLATFORM_MESSAGE_HOSTS = {
 const POPUP_MESSAGES = new Set([
   "status",
   "check-session",
+  "star-project-repo",
   "save-config",
   "github-disconnect",
   "reset",
@@ -83,6 +89,84 @@ function errorText(error, fallback = "Request failed") {
     .slice(0, 500);
 }
 
+function isGithubUnauthorized(error) {
+  return (
+    error?.code === "github-auth" || error?.status === 401 || errorText(error).includes("(401)")
+  );
+}
+
+async function setGithubAuthWarningBadge() {
+  await chrome.action.setBadgeBackgroundColor({ color: "#d84f4f" });
+  await chrome.action.setBadgeText({ text: "!" });
+}
+
+async function clearGithubAuthWarning() {
+  await store.set(store.KEYS.githubAuthNoticeAt, 0);
+  await chrome.action.setBadgeText({ text: "" });
+  if (chrome.notifications?.clear) {
+    const result = chrome.notifications.clear(GITHUB_AUTH_NOTICE_ID);
+    await result?.catch?.(() => {});
+  }
+}
+
+async function notifyGithubAuthRequired() {
+  const lastNoticeAt = await store.get(store.KEYS.githubAuthNoticeAt, 0);
+  if (Date.now() - Number(lastNoticeAt || 0) < GITHUB_AUTH_NOTICE_COOLDOWN_MS) return;
+  await store.set(store.KEYS.githubAuthNoticeAt, Date.now());
+  if (!chrome.notifications?.create) return;
+  await chrome.notifications.create(GITHUB_AUTH_NOTICE_ID, {
+    type: "basic",
+    iconUrl: chrome.runtime.getURL("icon.png"),
+    title: "CodeHub needs GitHub access",
+    message:
+      "GitHub authorization is no longer valid. Open CodeHub and reconnect to resume syncing.",
+    priority: 2,
+  });
+}
+
+async function invalidateGithubAuth() {
+  const config = await store.getConfig();
+  if (!config) return;
+  const alreadyInvalid =
+    !config.token && config.setupComplete === false && config.githubAuthInvalid === true;
+  await store.setConfig({
+    ...config,
+    token: "",
+    setupComplete: false,
+    githubAuthInvalid: true,
+  });
+  await store.set(store.KEYS.projectRepoStarred, false);
+  await store.setLastSync({
+    platform: "GitHub",
+    status: "failed",
+    error: "GitHub authorization expired — reconnect GitHub",
+  });
+  await setGithubAuthWarningBadge();
+  if (!alreadyInvalid) await notifyGithubAuthRequired();
+}
+
+async function checkGithubAuthHealth() {
+  const config = await store.getConfig();
+  if (config?.githubAuthInvalid === true) {
+    await setGithubAuthWarningBadge();
+    return;
+  }
+  if (!config?.token) return;
+  try {
+    await gh.verifyToken(config.token);
+  } catch (error) {
+    if (isGithubUnauthorized(error)) await invalidateGithubAuth();
+  }
+}
+
+function scheduleGithubAuthHealthCheck() {
+  if (!chrome.alarms?.create) return;
+  chrome.alarms.create(GITHUB_AUTH_ALARM, {
+    delayInMinutes: 1,
+    periodInMinutes: 60,
+  });
+}
+
 function sourceValue(value) {
   if (value == null) return null;
   if (
@@ -103,18 +187,6 @@ function textValue(value, label, max = MAX_FIELD_LENGTH) {
   return value.trim();
 }
 
-function multilineValue(value, label, max) {
-  if (value == null) return "";
-  if (
-    typeof value !== "string" ||
-    value.length > max ||
-    /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
-  ) {
-    throw new Error(`Invalid ${label}.`);
-  }
-  return value.trim();
-}
-
 function publicConfig(config) {
   if (!config || typeof config !== "object") return null;
   return {
@@ -124,7 +196,6 @@ function publicConfig(config) {
     repo: config.repo || "",
     owner: config.owner || "",
     platforms: config.platforms || {},
-    topicPriority: config.topicPriority || "",
     setupComplete: config.setupComplete !== false,
     hasToken: typeof config.token === "string" && config.token.length > 0,
   };
@@ -289,9 +360,8 @@ async function handleAccepted(platform, label, build) {
       const safeResult = { ...result, error: errMsg };
       // A revoked/expired OAuth token must flip the popup back to "Connect
       // GitHub" instead of looping on a token that will never work again.
-      if (errMsg.includes("(401)")) {
-        const cfg = await store.getConfig();
-        if (cfg) await store.setConfig({ ...cfg, token: "", owner: "" });
+      if (isGithubUnauthorized(result.error)) {
+        await invalidateGithubAuth();
         await store.setLastSync({
           platform: label,
           title,
@@ -325,13 +395,34 @@ async function handleAccepted(platform, label, build) {
 chrome.runtime.onInstalled.addListener(() => {
   store
     .migrate()
-    .then(() => installLiveDetectors())
+    .then(() => {
+      scheduleGithubAuthHealthCheck();
+      return installLiveDetectors();
+    })
     .catch(() => {});
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  store.migrate().catch(() => {});
+  scheduleGithubAuthHealthCheck();
+  store
+    .migrate()
+    .then(() => checkGithubAuthHealth())
+    .catch(() => {});
 });
+
+if (chrome.alarms?.onAlarm) {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === GITHUB_AUTH_ALARM) checkGithubAuthHealth().catch(() => {});
+  });
+}
+
+if (chrome.notifications?.onClicked) {
+  chrome.notifications.onClicked.addListener((notificationId) => {
+    if (notificationId !== GITHUB_AUTH_NOTICE_ID) return;
+    const result = chrome.action.openPopup?.();
+    result?.catch?.(() => {});
+  });
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
@@ -519,12 +610,36 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.type === "status") {
-      const [config, session, lastSync] = await Promise.all([
+      const [config, session, lastSync, projectRepoStarred] = await Promise.all([
         store.getConfig(),
         store.get(store.KEYS.session, null),
         store.get(store.KEYS.lastSync, null),
+        store.get(store.KEYS.projectRepoStarred, false),
       ]);
-      return sendResponse({ config: publicConfig(config), session, lastSync });
+      return sendResponse({
+        config: publicConfig(config),
+        session,
+        lastSync,
+        projectRepoStarred: projectRepoStarred === true,
+      });
+    }
+
+    if (msg.type === "star-project-repo") {
+      const config = await store.getConfig();
+      if (!config?.token) {
+        return sendResponse({ ok: false, error: "Connect GitHub before starring CodeHub." });
+      }
+      try {
+        await gh.starRepository(config.token, PROJECT_REPO_OWNER, PROJECT_REPO_NAME);
+        await store.set(store.KEYS.projectRepoStarred, true);
+        return sendResponse({ ok: true, starred: true });
+      } catch (error) {
+        if (isGithubUnauthorized(error)) await invalidateGithubAuth();
+        return sendResponse({
+          ok: false,
+          error: errorText(error, "Could not star CodeHub on GitHub."),
+        });
+      }
     }
 
     if (msg.type === "check-session") {
@@ -540,19 +655,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         codechef: codechef.checkSession,
         gfg: gfg.checkSession,
       };
-      const session = {};
+      const session = { profiles: {} };
       await Promise.all(
         enabledPlatforms(config).map(async (platformName) => {
           const check = checkers[platformName];
           const key = sessionKeyFor(platformName);
           if (!check || !key) return;
           try {
-            session[key] = (await check()).ok;
+            const result = await check();
+            session[key] = result.ok;
+            if (result.ok && typeof result.profileUrl === "string") {
+              session.profiles[platformName] = result.profileUrl;
+            }
           } catch {
             // A flaky probe must not raise a false "signed out" banner.
           }
         }),
       );
+      if (Object.keys(session.profiles).length === 0) delete session.profiles;
       await store.setSession(session);
       return sendResponse({ ok: Object.values(session).every((value) => value !== false) });
     }
@@ -566,11 +686,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const codechefHandle = textValue(msg.payload.codechefHandle, "CodeChef username", 64);
       const gfgHandle = textValue(msg.payload.gfgHandle, "GeeksforGeeks username", 64);
       const repo = textValue(msg.payload.repo, "repository name", 100);
-      const topicPriority = multilineValue(
-        msg.payload.topicPriority,
-        "LeetCode topic priority",
-        2000,
-      );
       const platforms = isRecord(msg.payload.platforms) ? msg.payload.platforms : {};
       for (const name of ["codeforces", "leetcode", "cses", "codechef", "gfg"]) {
         if (Object.hasOwn(platforms, name) && typeof platforms[name] !== "boolean") {
@@ -638,7 +753,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           );
         }
         await Promise.all(checks);
-        await gh.ensureRepo(token, owner, repo);
+        const repository = await gh.ensureRepo(token, owner, repo);
         const config = {
           handle: handle || "",
           codechefHandle: codechefHandle || "",
@@ -647,13 +762,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           repo,
           owner,
           platforms: enabled,
-          topicPriority: topicPriority || "",
           setupComplete: true,
+          githubAuthInvalid: false,
         };
-        const repoChanged = previous?.repo !== repo || previous?.owner !== owner;
-        if (repoChanged) await store.clearRepositoryState();
-        else await store.clearWorkState();
+        const synced = repository.synced || {};
+        await gh.putReadme(token, owner, repo, synced, handle || "");
+        await store.clearWorkState();
+        await store.set(store.KEYS.synced, synced);
         await store.setConfig(config);
+        if (msg.payload.connect === true) {
+          await store.set(store.KEYS.projectRepoStarred, false);
+        }
+        await clearGithubAuthWarning();
         await store.set(store.KEYS.lastSync, null);
         await installLiveDetectors();
 
@@ -665,18 +785,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await store.setSession(session);
         return sendResponse({ ok: true, owner });
       } catch (err) {
+        if (isGithubUnauthorized(err)) await invalidateGithubAuth();
         return sendResponse({ ok: false, error: errorText(err, "Could not save settings.") });
       }
     }
 
     if (msg.type === "github-disconnect") {
       await oauth.disconnect();
+      await clearGithubAuthWarning();
       return sendResponse({ ok: true });
     }
 
     if (msg.type === "reset") {
       await Promise.all([chrome.storage.local.clear(), chrome.storage.session.clear()]);
       await chrome.action.setBadgeText({ text: "" });
+      if (chrome.notifications?.clear) {
+        const result = chrome.notifications.clear(GITHUB_AUTH_NOTICE_ID);
+        await result?.catch?.(() => {});
+      }
       return sendResponse({ ok: true });
     }
 

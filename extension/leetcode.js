@@ -5,8 +5,6 @@
 // not belong to the submission (editorial/community snippets) and mismatch
 // problem titles.
 
-import * as store from "./storage.js";
-
 const LC = "https://leetcode.com";
 const REQUEST_TIMEOUT = 20_000;
 
@@ -88,17 +86,8 @@ const DEFAULT_TOPIC_PRIORITY = [
   "design",
 ];
 
-function getTopicPriority(config) {
-  if (!config || !config.topicPriority) return DEFAULT_TOPIC_PRIORITY;
-  const custom = config.topicPriority
-    .split("\n")
-    .map((s) => s.trim().toLowerCase().replace(/\s+/g, "-"))
-    .filter(Boolean);
-  return [...new Set([...custom, ...DEFAULT_TOPIC_PRIORITY])];
-}
-
-function pickPrimaryTopic(tags, config) {
-  const priority = getTopicPriority(config);
+function pickPrimaryTopic(tags) {
+  const priority = DEFAULT_TOPIC_PRIORITY;
   const tagSlugs = (tags || []).map((t) =>
     typeof t === "string" ? slugifyTag(t) : t.slug || slugifyTag(t.name),
   );
@@ -311,8 +300,12 @@ async function fetchSource(sub) {
 
 export async function checkSession() {
   try {
-    await username();
-    return { ok: true, error: null };
+    const user = await username();
+    return {
+      ok: true,
+      error: null,
+      profileUrl: `${LC}/u/${encodeURIComponent(user)}/`,
+    };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -325,12 +318,11 @@ export const PLATFORM = {
     return sub.problemId ? String(sub.problemId) : sub.slug || String(sub.id);
   },
   async fetchMetadata(sub) {
-    const config = await store.getConfig();
     const details = await submissionDetails(sub.id, sub.slug);
     const q = details.question || {};
     const slug = q.titleSlug || sub.slug || String(sub.id);
     const tags = (q.topicTags || []).map((t) => t.slug || t.name);
-    const topic = pickPrimaryTopic(tags, config);
+    const topic = pickPrimaryTopic(tags);
     const title = q.title || sub.title || slug.replace(/-/g, " ");
     const language = details.lang?.name || details.lang?.verboseName || sub.language || "";
     const ext = extFor(language);

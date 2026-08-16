@@ -1,5 +1,50 @@
 const $ = (id) => document.getElementById(id);
-const send = (msg) => chrome.runtime.sendMessage(msg);
+const previewView =
+  location.protocol === "file:" ? new URLSearchParams(location.search).get("preview") : null;
+const previewMode = previewView === "status" || previewView === "setup";
+const connectedPreviewState = {
+  config: {
+    handle: "Tushal_007",
+    codechefHandle: "tushallohar",
+    gfgHandle: "tushallohar",
+    repo: "testxyz",
+    owner: "tushallohar",
+    platforms: {
+      codeforces: true,
+      leetcode: true,
+      cses: true,
+      codechef: true,
+      gfg: true,
+    },
+    setupComplete: true,
+    hasToken: true,
+  },
+  session: { cfOk: true, lcOk: true, csesOk: true, codechefOk: true, gfgOk: true },
+  projectRepoStarred: false,
+};
+const previewState =
+  previewView === "setup"
+    ? {
+        config: {
+          handle: "Tushal_007",
+          codechefHandle: "tushallohar",
+          gfgHandle: "tushallohar",
+          repo: "CP-Solutions",
+          owner: "",
+          platforms: connectedPreviewState.config.platforms,
+          setupComplete: false,
+          hasToken: false,
+        },
+        session: {},
+      }
+    : connectedPreviewState;
+const send = previewMode
+  ? async (msg) => {
+      if (msg.type === "status") return previewState;
+      if (msg.type === "star-project-repo") return { ok: true, starred: true };
+      return { ok: true };
+    }
+  : (msg) => chrome.runtime.sendMessage(msg);
 let editing = false;
 let setupPopulated = false;
 
@@ -14,17 +59,6 @@ function populateForm(config) {
   $("platformCSES").checked = config.platforms?.cses !== false;
   $("platformCodeChef").checked = config.platforms?.codechef !== false;
   $("platformGFG").checked = config.platforms?.gfg !== false;
-  $("topicPriority").value = config.topicPriority || "";
-}
-
-function timeAgo(ts) {
-  const secs = Math.max(0, Math.round((Date.now() - ts) / 1000));
-  if (secs < 60) return "just now";
-  const mins = Math.round(secs / 60);
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
 }
 
 function renderGithubStatus(config) {
@@ -45,14 +79,34 @@ function renderGithubStatus(config) {
   }
 }
 
+function renderStarState(starred, connected) {
+  const button = $("starRepo");
+  if (!button) return;
+  button.classList.toggle("is-starred", starred);
+  button.classList.remove("is-loading");
+  button.disabled = starred || !connected;
+  button.setAttribute("aria-pressed", String(starred));
+  button.setAttribute(
+    "aria-label",
+    starred ? "CodeHub is starred on GitHub" : "Star CodeHub on GitHub",
+  );
+  button.title = starred
+    ? "CodeHub is starred"
+    : connected
+      ? "Star CodeHub"
+      : "Connect GitHub to star CodeHub";
+}
+
 function render(state) {
   if (!state) return;
   const config = state.config;
   const configured = Boolean(
     config && config.hasToken && config.owner && config.setupComplete !== false,
   );
+  renderStarState(state.projectRepoStarred === true, configured);
   $("setup").classList.toggle("hidden", configured && !editing);
   $("status").classList.toggle("hidden", !configured || editing);
+  $("cancelEdit").classList.toggle("hidden", !configured || !editing);
 
   renderGithubStatus(config);
 
@@ -71,11 +125,7 @@ function render(state) {
     statusDot.className = `status-dot ${anyBad ? "bad" : cfOk === true || lcOk === true || csesOk === true || codechefOk === true || gfgOk === true ? "ok" : ""}`;
   }
   if (statusText) {
-    statusText.textContent = anyBad
-      ? "Auth Required"
-      : configured
-        ? "Live Sync Active"
-        : "Setup Required";
+    statusText.textContent = anyBad ? "Auth Required" : configured ? "Live" : "Setup Required";
   }
 
   const banner = $("banner");
@@ -113,49 +163,83 @@ function render(state) {
     setupPopulated = true;
   }
 
-  const userParts = [config.handle, config.codechefHandle, config.gfgHandle].filter(Boolean);
-  const userDisplay = userParts.length > 0 ? userParts.join(" / ") : "LeetCode";
   if ($("repoLine")) {
-    $("repoLine").textContent = `${userDisplay} → ${config.owner}/${config.repo}`;
+    $("repoLine").textContent = `${config.owner}/${config.repo}`;
   }
   if ($("repoLink")) {
     $("repoLink").href = `https://github.com/${config.owner}/${config.repo}`;
-  }
-
-  const line = $("lastSyncLine");
-  if (line) {
-    const last = state.lastSync;
-    if (!last) {
-      line.classList.add("hidden");
-      line.textContent = "";
-    } else {
-      line.classList.remove("hidden");
-      const failed = last.status === "failed";
-      line.classList.toggle("bad", failed);
-      const when = last.at ? timeAgo(last.at) : "";
-      const what = [last.platform, last.title].filter(Boolean).join(" ");
-      line.textContent = failed
-        ? `Last sync: ${what} — failed: ${last.error || "unknown error"}${when ? ` (${when})` : ""}`
-        : `Last sync: ${what} — ${last.status}${when ? `, ${when}` : ""}`;
-    }
   }
 
   const platforms = config.platforms || {};
   const badges = $("activeBadges");
   if (badges) {
     badges.replaceChildren();
+    const profiles = session.profiles || {};
     const enabled = [
-      ["codeforces", "CF", "cf-mini"],
-      ["leetcode", "LC", "lc-mini"],
-      ["cses", "CSES", "cses-mini"],
-      ["codechef", "CC", "codechef-mini"],
-      ["gfg", "GFG", "gfg-mini"],
+      [
+        "codeforces",
+        "Codeforces",
+        "cf-mini",
+        "icons/codeforces.svg",
+        config.handle
+          ? `https://codeforces.com/profile/${encodeURIComponent(config.handle)}`
+          : "https://codeforces.com/",
+      ],
+      [
+        "leetcode",
+        "LeetCode",
+        "lc-mini",
+        "icons/leetcode.png",
+        profiles.leetcode || "https://leetcode.com/",
+      ],
+      ["cses", "CSES", "cses-mini", "icons/cses.svg", profiles.cses || "https://cses.fi/"],
+      [
+        "codechef",
+        "CodeChef",
+        "codechef-mini",
+        "icons/codechef.svg",
+        config.codechefHandle
+          ? `https://www.codechef.com/users/${encodeURIComponent(config.codechefHandle)}`
+          : "https://www.codechef.com/",
+      ],
+      [
+        "gfg",
+        "GeeksforGeeks",
+        "gfg-mini",
+        "icons/geeksforgeeks.svg",
+        config.gfgHandle
+          ? `https://www.geeksforgeeks.org/user/${encodeURIComponent(config.gfgHandle)}/`
+          : "https://www.geeksforgeeks.org/",
+      ],
     ];
-    for (const [platform, label, className] of enabled) {
+    for (const [platform, label, className, iconPath, profileUrl] of enabled) {
       if (platforms[platform] === false) continue;
-      const badge = document.createElement("span");
+      const badge = document.createElement("a");
       badge.className = `mini-badge ${className}`;
-      badge.textContent = label;
+      badge.href = profileUrl;
+      badge.target = "_blank";
+      badge.rel = "noreferrer";
+      badge.title = `Open ${label} profile`;
+
+      const iconFrame = document.createElement("span");
+      iconFrame.className = "platform-logo-frame";
+      const icon = document.createElement("img");
+      icon.src = iconPath;
+      icon.alt = "";
+      iconFrame.append(icon);
+
+      const name = document.createElement("span");
+      name.className = "mini-badge-label";
+      name.textContent = label;
+
+      const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      arrow.classList.add("mini-badge-arrow");
+      arrow.setAttribute("aria-hidden", "true");
+      const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+      use.setAttribute("href", "#icon-chevron");
+      arrow.append(use);
+
+      badge.append(iconFrame, name, arrow);
       badges.append(badge);
     }
   }
@@ -180,7 +264,6 @@ function readSetupForm() {
   const codechefHandle = $("codechefHandle").value.trim();
   const gfgHandle = $("gfgHandle").value.trim();
   const repo = $("repo").value.trim() || "CP-Solutions";
-  const topicPriority = $("topicPriority").value.trim();
 
   if (
     !platforms.codeforces &&
@@ -200,7 +283,7 @@ function readSetupForm() {
   if (platforms.gfg && !gfgHandle) {
     return { error: "Enter your GeeksforGeeks username." };
   }
-  return { handle, codechefHandle, gfgHandle, repo, platforms, topicPriority };
+  return { handle, codechefHandle, gfgHandle, repo, platforms };
 }
 
 async function submitSetup(forceConnect) {
@@ -248,10 +331,29 @@ async function submitSetup(forceConnect) {
 $("githubConnect").addEventListener("click", () => submitSetup(true));
 $("save").addEventListener("click", () => submitSetup(false));
 
+$("starRepo").addEventListener("click", async () => {
+  const button = $("starRepo");
+  if (button.disabled) return;
+  button.disabled = true;
+  button.classList.add("is-loading");
+  button.title = "Starring CodeHub...";
+  try {
+    const result = await send({ type: "star-project-repo" });
+    if (!result?.ok || result.starred !== true) {
+      throw new Error(result?.error || "Could not star CodeHub on GitHub.");
+    }
+    renderStarState(true, true);
+  } catch (error) {
+    renderStarState(false, true);
+    alert(error instanceof Error ? error.message : "Could not star CodeHub on GitHub.");
+  }
+});
+
 $("edit").addEventListener("click", async () => {
   editing = true;
   $("setup").classList.remove("hidden");
   $("status").classList.add("hidden");
+  $("cancelEdit").classList.remove("hidden");
   try {
     const res = await send({ type: "status" });
     if (res?.config) {
@@ -260,6 +362,12 @@ $("edit").addEventListener("click", async () => {
     }
     renderGithubStatus(res?.config);
   } catch {}
+});
+
+$("cancelEdit").addEventListener("click", () => {
+  editing = false;
+  $("setupError").classList.add("hidden");
+  refresh();
 });
 
 $("disconnectGithub").addEventListener("click", async () => {

@@ -14,6 +14,9 @@ import {
   Sparkles,
 } from "lucide-react";
 
+const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/";
+const SITE_URL = "https://codehub-oauth.vercel.app";
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -33,7 +36,57 @@ export const Route = createFileRoute("/")({
           "Keep solving. CodeHub files every accepted solution into the right folder on GitHub automatically.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:site_name", content: "CodeHub" },
+      { property: "og:image", content: `${SITE_URL}/og-image.png` },
+      { property: "og:image:alt", content: "CodeHub live coding solution sync" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "CodeHub — Live CP Solves to GitHub" },
+      {
+        name: "twitter:description",
+        content: "Automatically organize accepted competitive-programming solutions in GitHub.",
+      },
+      { name: "twitter:image", content: `${SITE_URL}/og-image.png` },
+    ],
+    links: [{ rel: "canonical", href: SITE_URL }],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "SoftwareApplication",
+              name: "CodeHub",
+              applicationCategory: "DeveloperApplication",
+              operatingSystem: "Chrome, Edge, Brave, Arc",
+              description:
+                "A browser extension that syncs accepted competitive-programming solutions to GitHub.",
+              url: SITE_URL,
+              downloadUrl: CHROME_WEB_STORE_URL,
+              softwareVersion: "1.0.1",
+              author: { "@type": "Person", name: "Tushal Lohar" },
+              offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            },
+            {
+              "@type": "Organization",
+              name: "CodeHub",
+              url: SITE_URL,
+              logo: `${SITE_URL}/codehub-brand.png`,
+              sameAs: ["https://github.com/TushalLohar"],
+            },
+            { "@type": "WebSite", name: "CodeHub", url: SITE_URL },
+            {
+              "@type": "FAQPage",
+              mainEntity: FAQS.map((item) => ({
+                "@type": "Question",
+                name: item.question,
+                acceptedAnswer: { "@type": "Answer", text: item.answer },
+              })),
+            },
+          ],
+        }),
+      },
     ],
   }),
   component: Home,
@@ -227,6 +280,33 @@ const FEATURES = [
   },
 ];
 
+const FAQS = [
+  {
+    question: "What does CodeHub do?",
+    answer:
+      "CodeHub detects newly accepted coding submissions and saves the source code to a GitHub repository using consistent platform-specific folders.",
+  },
+  {
+    question: "Which coding platforms does CodeHub support?",
+    answer: "CodeHub supports Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks.",
+  },
+  {
+    question: "Does CodeHub upload source code to its own server?",
+    answer:
+      "No. The extension sends repository updates directly to GitHub. The CodeHub OAuth service handles only the short-lived GitHub authorization exchange.",
+  },
+  {
+    question: "Can CodeHub use an existing GitHub repository?",
+    answer:
+      "Yes. CodeHub can inspect compatible solution folders in an existing repository and preserve content outside its managed README summary block.",
+  },
+  {
+    question: "Does CodeHub import every old solved problem automatically?",
+    answer:
+      "No. CodeHub focuses on live accepted submissions. Existing compatible files are indexed when you connect a repository, but old platform submissions are not scraped in bulk.",
+  },
+];
+
 function Home() {
   const [activePlatform, setActivePlatform] = useState("codeforces");
 
@@ -244,12 +324,12 @@ function Home() {
             <span className="font-mono text-xs font-semibold text-primary tracking-widest uppercase">
               Manifest V3 Extension
             </span>
-            <div className="font-mono text-sm font-bold text-foreground">CodeHub v4.1.3</div>
+            <div className="font-mono text-sm font-bold text-foreground">CodeHub v1.0.1</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <a
-            href="https://github.com"
+            href="https://github.com/TushalLohar/CodeHub"
             target="_blank"
             rel="noreferrer"
             className="glass-card glass-card-hover inline-flex items-center gap-2 rounded-lg px-4 py-2 font-mono text-xs font-semibold text-foreground transition-all cursor-pointer"
@@ -258,12 +338,13 @@ function Home() {
             <span>GitHub Sync</span>
           </a>
           <a
-            href="/cf-sync.zip"
-            download
+            href={CHROME_WEB_STORE_URL}
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-mono text-xs font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 cursor-pointer"
           >
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Download ZIP</span>
+            <span>Chrome Web Store</span>
           </a>
         </div>
       </header>
@@ -295,17 +376,29 @@ function Home() {
 
         <div className="mt-9 flex flex-wrap items-center gap-4">
           <a
-            href="/cf-sync.zip"
-            download
+            href={CHROME_WEB_STORE_URL}
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-7 py-3.5 font-mono text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:opacity-90 hover:scale-[1.02] cursor-pointer"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
-            Download Extension (v4.1.3)
+            Install from Chrome Web Store
           </a>
           <span className="font-mono text-xs text-muted-foreground">
             Chrome · Edge · Brave · Arc (Manifest V3)
           </span>
         </div>
+        <p className="mt-3 font-mono text-xs text-muted-foreground">
+          Developer preview:{" "}
+          <a
+            className="text-primary underline-offset-4 hover:underline"
+            href="/cf-sync.zip"
+            download
+          >
+            download the ZIP manually
+          </a>
+          .
+        </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground mr-2">Codeforces Ratings:</span>
@@ -521,6 +614,24 @@ function Home() {
             </span>
           </li>
         </ul>
+      </section>
+
+      <section className="py-16" aria-labelledby="faq-title">
+        <h2 id="faq-title" className="text-2xl font-bold">
+          Frequently Asked Questions
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Clear answers about installation, supported coding platforms, GitHub access, and how
+          CodeHub handles your source code.
+        </p>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          {FAQS.map((item) => (
+            <article key={item.question} className="glass-card rounded-xl p-5">
+              <h3 className="text-base font-bold text-foreground">{item.question}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.answer}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <footer className="mt-16 border-t border-border pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-muted-foreground">

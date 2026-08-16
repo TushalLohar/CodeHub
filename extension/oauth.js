@@ -78,10 +78,13 @@ export async function connect() {
 export async function disconnect() {
   const config = await store.getConfig();
   if (!config) return;
-  await store.setConfig({
-    ...config,
-    token: "",
-    owner: "",
-    setupComplete: false,
-  });
+  await Promise.all([
+    store.setConfig({
+      ...config,
+      token: "",
+      setupComplete: false,
+      githubAuthInvalid: false,
+    }),
+    store.set(store.KEYS.projectRepoStarred, false),
+  ]);
 }

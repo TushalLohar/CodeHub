@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubLeetCodeMainInstalled) return;
-  window.__codehubLeetCodeMainInstalled = true;
+  if (window.__solvebaseLeetCodeMainInstalled) return;
+  window.__solvebaseLeetCodeMainInstalled = true;
 
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
   const MAX_RESPONSE_CHARS = 1024 * 1024;
@@ -153,7 +153,7 @@
     lastSubmitRequestAt = 0;
     window.postMessage(
       {
-        type: "__CODEHUB_LC_ACCEPTED__",
+        type: "__SOLVEBASE_LC_ACCEPTED__",
         submissionId: numericId || undefined,
         slug,
       },
@@ -215,13 +215,13 @@
   const nativeOpen = XMLHttpRequest.prototype.open;
   const nativeSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this.__codehubLeetCodeUrl = String(url || "");
-    this.__codehubLeetCodeMethod = String(method || "GET").toUpperCase();
+    this.__solvebaseLeetCodeUrl = String(url || "");
+    this.__solvebaseLeetCodeMethod = String(method || "GET").toUpperCase();
     return nativeOpen.call(this, method, url, ...rest);
   };
   XMLHttpRequest.prototype.send = function (...args) {
-    const url = this.__codehubLeetCodeUrl || "";
-    const method = this.__codehubLeetCodeMethod || "GET";
+    const url = this.__solvebaseLeetCodeUrl || "";
+    const method = this.__solvebaseLeetCodeMethod || "GET";
     const shouldInspect = isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
     if (isPotentialSubmissionStart(url, method)) {
       lastSubmitRequestAt = Date.now();

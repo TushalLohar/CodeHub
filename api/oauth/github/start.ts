@@ -46,7 +46,7 @@ export default async function handler(
 
     const state = randomToken();
     const stored = await setJson(
-      `codehub:oauth:state:${sha256(state)}`,
+      `solvebase:oauth:state:${sha256(state)}`,
       { challenge },
       OAUTH_STATE_TTL,
     );

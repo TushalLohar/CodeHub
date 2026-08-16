@@ -11,8 +11,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubGFGContentInstalled) return;
-  window.__codehubGFGContentInstalled = true;
+  if (window.__solvebaseGFGContentInstalled) return;
+  window.__solvebaseGFGContentInstalled = true;
 
   const PENDING_TTL = 150_000;
   const reported = new Set();

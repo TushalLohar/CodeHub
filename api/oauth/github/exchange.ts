@@ -62,7 +62,7 @@ export default async function handler(
       return;
     }
 
-    const key = `codehub:oauth:exchange:${sha256(code)}`;
+    const key = `solvebase:oauth:exchange:${sha256(code)}`;
     const stored = await getValue(key);
     if (!stored) {
       sendJson(response, 400, { error: "exchange_expired" }, headers);

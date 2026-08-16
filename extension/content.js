@@ -9,8 +9,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubCodeforcesContentInstalled) return;
-  window.__codehubCodeforcesContentInstalled = true;
+  if (window.__solvebaseCodeforcesContentInstalled) return;
+  window.__solvebaseCodeforcesContentInstalled = true;
 
   const PENDING_TTL = 15 * 60 * 1000; // verdicts can queue for a few minutes
   const reported = new Set();

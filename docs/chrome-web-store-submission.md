@@ -5,8 +5,8 @@
 - Product name: `SolveBase - Solves to GitHub`
 - Category: `Developer Tools`
 - Language: `English`
-- Homepage: `https://codehub-oauth.vercel.app/`
-- Privacy policy: `https://codehub-oauth.vercel.app/privacy`
+- Homepage: `https://solvebase.dev/`
+- Privacy policy: `https://solvebase.dev/privacy`
 - Support: `https://github.com/TushalLohar/SolveBase/issues`
 
 Short description:
@@ -66,7 +66,7 @@ Displays a reconnect notification when GitHub authorization is no longer valid. 
 
 - `codeforces.com`, `leetcode.com`, `cses.fi`, `codechef.com`, and `geeksforgeeks.org`: detect accepted submissions and read the user's solution source and problem metadata.
 - `api.github.com`: verify the connected account and create or update files in the repository selected by the user.
-- `codehub-oauth.vercel.app`: start and complete the short-lived GitHub OAuth exchange.
+- `solvebase.dev`: start and complete the short-lived GitHub OAuth exchange.
 
 ## Data Disclosure
 
@@ -82,7 +82,7 @@ The data is used only for the extension's single purpose. It is not sold, used f
 
 1. Rename the GitHub repository to `SolveBase`.
 2. Rename the GitHub OAuth App display name to `SolveBase`.
-3. Confirm its callback URL remains `https://codehub-oauth.vercel.app/api/oauth/github/callback`.
+3. Confirm its callback URL remains `https://solvebase.dev/api/oauth/github/callback`.
 4. Deploy the rebranded website so the privacy-policy URL is public.
 5. Load the packaged extension locally and complete one clean GitHub connection and accepted-submission test.
 6. Upload `SolveBase-1.0.1.zip` as a new Chrome Web Store item without publishing it. This first-upload package intentionally omits the local beta public key so Google can assign the permanent Store item identity.

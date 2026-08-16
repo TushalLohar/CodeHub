@@ -45,10 +45,10 @@ assert.match(updated, /\*\*Total solved: 0\*\*/);
 assert.doesNotMatch(updated, /\*\*Total solved: 6\*\*/);
 
 const migrated = mergeReadme(
-  "<!-- cf-sync -->\n# Old CodeHub README\n\n**Total solved: 1**\n",
+  "<!-- cf-sync -->\n# Old managed README\n\n**Total solved: 1**\n",
   generated,
 );
-assert.doesNotMatch(migrated, /Old CodeHub README/);
+assert.doesNotMatch(migrated, /Old managed README/);
 assert.match(migrated, /\*\*Total solved: 6\*\*/);
 
 const requests: string[] = [];
@@ -73,7 +73,7 @@ globalThis.fetch = (async (input: string | URL | Request) => {
   if (url.endsWith("/repos/octocat/solutions/contents/README.md")) {
     return Response.json({
       sha: "readme-sha",
-      content: btoa("<!-- cf-sync -->\n# Existing CodeHub README\n"),
+      content: btoa("<!-- cf-sync -->\n# Existing managed README\n"),
     });
   }
   throw new Error(`Unexpected GitHub request: ${url}`);

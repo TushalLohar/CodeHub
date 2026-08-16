@@ -1,7 +1,7 @@
 import * as store from "./storage.js";
 import * as gh from "./github.js";
 
-const OAUTH_API_BASE = "https://codehub-oauth.vercel.app";
+const OAUTH_API_BASE = "https://solvebase.dev";
 const REQUEST_TIMEOUT = 30000;
 
 function randomBase64Url(bytes = 32) {

@@ -47,7 +47,7 @@ export default async function handler(
       return;
     }
 
-    const stateValue = await getAndDelete(`codehub:oauth:state:${sha256(state)}`);
+    const stateValue = await getAndDelete(`solvebase:oauth:state:${sha256(state)}`);
     if (!stateValue) {
       extensionError(config, response);
       return;
@@ -99,7 +99,7 @@ export default async function handler(
       config.tokenEncryptionKey,
     );
     const stored = await setValue(
-      `codehub:oauth:exchange:${sha256(exchangeCode)}`,
+      `solvebase:oauth:exchange:${sha256(exchangeCode)}`,
       payload,
       EXCHANGE_CODE_TTL,
     );

@@ -40,12 +40,12 @@ older Codeforces repositories with rating folders at the repository root.
 
 ### Vercel Setup
 
-1. Create a Vercel project from this repository and note its stable production URL.
+1. Create a Vercel project from this repository and connect `solvebase.dev` to Production.
 2. Add an Upstash Redis integration and expose its REST URL and token as `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 3. Add the environment variables listed in `.env.example` to the Vercel Production environment.
 4. Generate `TOKEN_ENCRYPTION_KEY` locally with `openssl rand -base64 32`.
 5. Set the GitHub OAuth App redirect URI to the exact value of `GITHUB_CALLBACK_URL`.
-6. If the production URL is not `https://codehub-oauth.vercel.app`, replace that origin in both `extension/oauth.js` and `extension/manifest.json`.
+6. Keep `https://solvebase.dev` configured in both `extension/oauth.js` and `extension/manifest.json`.
 7. Redeploy Vercel, reload the unpacked extension, and test Connect GitHub.
 
 The GitHub client secret, Redis token, and encryption key must exist only in Vercel environment variables. Never prefix them with `VITE_`, expose them through frontend code, or commit a real `.env` file.

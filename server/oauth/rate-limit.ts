@@ -16,7 +16,7 @@ export async function enforceRateLimit(
   limit: number,
   windowSeconds: number,
 ): Promise<void> {
-  const key = `codehub:oauth:rate:${bucket}:${sha256(identity)}`;
+  const key = `solvebase:oauth:rate:${bucket}:${sha256(identity)}`;
   const count = await incrementWindow(key, windowSeconds);
   if (count > limit) throw new RateLimitError(windowSeconds);
 }

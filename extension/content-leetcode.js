@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubLeetCodeContentInstalled) return;
-  window.__codehubLeetCodeContentInstalled = true;
+  if (window.__solvebaseLeetCodeContentInstalled) return;
+  window.__solvebaseLeetCodeContentInstalled = true;
 
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
   const seen = new Set();
@@ -95,7 +95,7 @@
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     const data = event.data;
-    if (!data || data.type !== "__CODEHUB_LC_ACCEPTED__") return;
+    if (!data || data.type !== "__SOLVEBASE_LC_ACCEPTED__") return;
 
     const id = String(data.submissionId || "");
     if (id && !/^\d+$/.test(id)) return;

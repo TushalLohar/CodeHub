@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://codehub-oauth.vercel.app/sitemap.xml
+Sitemap: https://solvebase.dev/sitemap.xml

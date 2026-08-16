@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/";
-const SITE_URL = "https://codehub-oauth.vercel.app";
+const SITE_URL = "https://solvebase.dev";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -388,18 +388,6 @@ function Home() {
             Chrome · Edge · Brave · Arc (Manifest V3)
           </span>
         </div>
-        <p className="mt-3 font-mono text-xs text-muted-foreground">
-          Developer preview:{" "}
-          <a
-            className="text-primary underline-offset-4 hover:underline"
-            href="/cf-sync.zip"
-            download
-          >
-            download the ZIP manually
-          </a>
-          .
-        </p>
-
         <div className="mt-10 flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs text-muted-foreground mr-2">Codeforces Ratings:</span>
           {RATINGS.map((r) => (

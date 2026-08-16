@@ -9,8 +9,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubCSESContentInstalled) return;
-  window.__codehubCSESContentInstalled = true;
+  if (window.__solvebaseCSESContentInstalled) return;
+  window.__solvebaseCSESContentInstalled = true;
 
   const PENDING_TTL = 15 * 60 * 1000;
   const seen = new Set();

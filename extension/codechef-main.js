@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubCodeChefMainInstalled) return;
-  window.__codehubCodeChefMainInstalled = true;
+  if (window.__solvebaseCodeChefMainInstalled) return;
+  window.__solvebaseCodeChefMainInstalled = true;
 
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
   const MAX_RESPONSE_CHARS = 1024 * 1024;
@@ -242,13 +242,13 @@
   const nativeOpen = XMLHttpRequest.prototype.open;
   const nativeSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this.__codehubCodeChefUrl = String(url || "");
-    this.__codehubCodeChefMethod = String(method || "GET").toUpperCase();
+    this.__solvebaseCodeChefUrl = String(url || "");
+    this.__solvebaseCodeChefMethod = String(method || "GET").toUpperCase();
     return nativeOpen.call(this, method, url, ...rest);
   };
   XMLHttpRequest.prototype.send = function (...args) {
-    const url = this.__codehubCodeChefUrl || "";
-    const method = this.__codehubCodeChefMethod || "GET";
+    const url = this.__solvebaseCodeChefUrl || "";
+    const method = this.__solvebaseCodeChefMethod || "GET";
     noteSubmissionStart(url, method);
     if (isSubmissionRequest(url) || isPotentialSubmissionStart(url, method)) {
       this.addEventListener("load", () => inspect(url, method, this.responseText), { once: true });

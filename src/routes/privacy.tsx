@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const SITE_URL = "https://codehub-oauth.vercel.app";
+const SITE_URL = "https://solvebase.dev";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
@@ -38,7 +38,7 @@ const sections = [
     body: [
       "Accepted solution source code is sent directly from the extension to GitHub through GitHub's API. SolveBase does not send source code to its own backend and does not use it for analytics, advertising, profiling, or model training.",
       "SolveBase never sends coding-platform cookie values to GitHub or to the SolveBase OAuth service. Chrome supplies those cookies only to requests made to the same coding platform that created them.",
-      "The OAuth service at codehub-oauth.vercel.app performs the GitHub authorization exchange. OAuth state expires after five minutes, and the encrypted one-time token exchange expires after sixty seconds. The service also keeps short-lived rate-limit records to prevent abuse.",
+      "The OAuth service at solvebase.dev performs the GitHub authorization exchange. OAuth state expires after five minutes, and the encrypted one-time token exchange expires after sixty seconds. The service also keeps short-lived rate-limit records to prevent abuse.",
     ],
   },
   {

@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  if (window.__codehubCodeChefContentInstalled) return;
-  window.__codehubCodeChefContentInstalled = true;
+  if (window.__solvebaseCodeChefContentInstalled) return;
+  window.__solvebaseCodeChefContentInstalled = true;
 
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
   const reported = new Set();

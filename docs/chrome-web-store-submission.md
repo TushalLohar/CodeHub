@@ -78,15 +78,4 @@ Declare that the extension handles:
 
 The data is used only for the extension's single purpose. It is not sold, used for advertising, used for credit decisions, or transferred for unrelated purposes. Solution source code is sent directly to GitHub and not to the SolveBase OAuth backend.
 
-## Before Uploading
 
-1. Rename the GitHub repository to `SolveBase`.
-2. Rename the GitHub OAuth App display name to `SolveBase`.
-3. Confirm its callback URL remains `https://solvebase.dev/api/oauth/github/callback`.
-4. Deploy the rebranded website so the privacy-policy URL is public.
-5. Load the packaged extension locally and complete one clean GitHub connection and accepted-submission test.
-6. Upload `SolveBase-1.0.1.zip` as a new Chrome Web Store item without publishing it. This first-upload package intentionally omits the local beta public key so Google can assign the permanent Store item identity.
-7. From the Package tab, record the Item ID and copy the public key shown by the dashboard.
-8. Replace the manifest `key` with that dashboard public key, set Vercel's `EXTENSION_ID` to the Store Item ID, redeploy the OAuth backend, and rebuild the final ZIP.
-9. Upload the rebuilt ZIP to the existing draft item and verify the unpacked extension ID matches the Store Item ID.
-10. Submit first as an unlisted release, complete a real Web Store install test, and only then switch visibility to public.

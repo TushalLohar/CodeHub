@@ -198,6 +198,7 @@ function publicConfig(config) {
     platforms: config.platforms || {},
     setupComplete: config.setupComplete !== false,
     hasToken: typeof config.token === "string" && config.token.length > 0,
+    repoVisibilityConfirmed: config.repoVisibilityConfirmed === true,
   };
 }
 
@@ -276,6 +277,10 @@ async function handleWitnessMessage(msg, sender) {
   if (msg.action !== "set") throw new Error("Invalid submission witness action.");
 
   const data = sanitizeWitness(msg.type, msg.data);
+  if (msg.type === "gfg-witness") {
+    const source = sourceValue(await gfg.readEditorFromTab(sender.tab.id));
+    if (source) data.source = source;
+  }
   const at = Date.now();
   await chrome.storage.session.set({ [key]: { at, data } });
   return { ok: true, witness: { ...data, time: at } };
@@ -286,16 +291,42 @@ async function handleWitnessMessage(msg, sender) {
 // not leave live sync inactive until every tab is reloaded.
 const LIVE_SCRIPTS = [
   { matches: ["https://codeforces.com/*"], files: ["content.js"], world: "ISOLATED" },
-  { matches: ["https://leetcode.com/*"], files: ["leetcode-main.js"], world: "MAIN" },
-  { matches: ["https://leetcode.com/*"], files: ["content-leetcode.js"], world: "ISOLATED" },
+  {
+    matches: ["https://leetcode.com/problems/*"],
+    files: ["leetcode-main.js"],
+    world: "MAIN",
+  },
+  {
+    matches: ["https://leetcode.com/problems/*"],
+    files: ["content-leetcode.js"],
+    world: "ISOLATED",
+  },
   { matches: ["https://cses.fi/*"], files: ["content-cses.js"], world: "ISOLATED" },
   {
-    matches: ["https://*.codechef.com/*", "https://codechef.com/*"],
+    matches: [
+      "https://*.codechef.com/problems/*",
+      "https://*.codechef.com/submit/*",
+      "https://*.codechef.com/*/problems/*",
+      "https://*.codechef.com/*/submit/*",
+      "https://codechef.com/problems/*",
+      "https://codechef.com/submit/*",
+      "https://codechef.com/*/problems/*",
+      "https://codechef.com/*/submit/*",
+    ],
     files: ["codechef-main.js"],
     world: "MAIN",
   },
   {
-    matches: ["https://*.codechef.com/*", "https://codechef.com/*"],
+    matches: [
+      "https://*.codechef.com/problems/*",
+      "https://*.codechef.com/submit/*",
+      "https://*.codechef.com/*/problems/*",
+      "https://*.codechef.com/*/submit/*",
+      "https://codechef.com/problems/*",
+      "https://codechef.com/submit/*",
+      "https://codechef.com/*/problems/*",
+      "https://codechef.com/*/submit/*",
+    ],
     files: ["content-codechef.js"],
     world: "ISOLATED",
   },
@@ -330,14 +361,14 @@ async function handleAccepted(platform, label, build) {
   const config = await store.getConfig();
   if (!config) {
     await store.setLastSync({ platform: label, status: "failed", error: "Finish setup first" });
-    return { ok: false, error: "Finish setup first" };
+    return { ok: false, retry: false, error: "Finish setup first" };
   }
   if (config.setupComplete === false) {
     await store.setLastSync({ platform: label, status: "failed", error: "Finish setup first" });
-    return { ok: false, error: "Finish setup first" };
+    return { ok: false, retry: false, error: "Finish setup first" };
   }
   if (config.platforms?.[platform] === false) {
-    return { ok: false, error: `${label} is not enabled` };
+    return { ok: false, retry: false, error: `${label} is not enabled` };
   }
   try {
     const submission = await build(config);
@@ -353,14 +384,17 @@ async function handleAccepted(platform, label, build) {
     const title = result?.meta?.title || submission.problemName || submission.title || "solution";
     if (result.outcome === "duplicate" || result.outcome === "unchanged") {
       await store.setLastSync({ platform: label, title, status: "already synced" });
-      return { ok: true, queued: true };
+      return { ok: true, result };
+    }
+    if (result.outcome === "unconfigured") {
+      return { ok: false, retry: false, error: "Finish setup first" };
     }
     if (result.outcome === "failed") {
       const errMsg = errorText(result.error);
       const safeResult = { ...result, error: errMsg };
       // A revoked/expired OAuth token must flip the popup back to "Connect
       // GitHub" instead of looping on a token that will never work again.
-      if (isGithubUnauthorized(result.error)) {
+      if (result.code === "github-auth" || isGithubUnauthorized(result.error)) {
         await invalidateGithubAuth();
         await store.setLastSync({
           platform: label,
@@ -368,7 +402,7 @@ async function handleAccepted(platform, label, build) {
           status: "failed",
           error: "GitHub access expired — reconnect GitHub",
         });
-        return { ok: false, queued: true, result: safeResult, reauth: true };
+        return { ok: false, retry: false, result: safeResult, reauth: true };
       }
       await store.setLastSync({
         platform: label,
@@ -376,7 +410,11 @@ async function handleAccepted(platform, label, build) {
         status: "failed",
         error: errMsg,
       });
-      return { ok: false, queued: true, result: safeResult };
+      return {
+        ok: false,
+        retry: result.code === "transient" || result.code === "ratelimit",
+        result: safeResult,
+      };
     }
     await store.setLastSync({
       platform: label,
@@ -384,10 +422,21 @@ async function handleAccepted(platform, label, build) {
       status: "committed",
       path: result?.meta?.path || "",
     });
-    return { ok: true, queued: true, result };
+    return { ok: true, result };
   } catch (err) {
     const message = errorText(err);
     await store.setLastSync({ platform: label, status: "failed", error: message });
+    if (isGithubUnauthorized(err)) {
+      await invalidateGithubAuth();
+      return { ok: false, retry: false, reauth: true, error: message };
+    }
+    if (err?.code === "auth") {
+      const session = (await store.get(store.KEYS.session, {})) || {};
+      const flag = sessionKeyFor(platform);
+      if (flag) session[flag] = false;
+      await store.setSession(session);
+      return { ok: false, retry: false, error: message };
+    }
     return { ok: false, retry: true, error: message };
   }
 }
@@ -448,12 +497,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return sendResponse(
         await handleAccepted("codeforces", "Codeforces", async (config) => {
           let match = null;
+          let lookupError = null;
           const handle = config.handle || "";
           for (let attempt = 0; handle && attempt < 4 && !match; attempt++) {
-            const submissions = await cf.getAcceptedSubmissions(handle, 100).catch(() => []);
+            let submissions = [];
+            try {
+              submissions = await cf.getAcceptedSubmissions(handle, 100);
+              lookupError = null;
+            } catch (error) {
+              lookupError = error;
+              if (error?.code !== "transient") throw error;
+            }
             match = submissions.find((sub) => String(sub.id) === submissionId);
             if (!match && attempt < 3) await new Promise((r) => setTimeout(r, 750));
           }
+          if (!match && lookupError) throw lookupError;
           if (!match) {
             throw new Error("Codeforces has not confirmed this accepted submission yet.");
           }
@@ -491,8 +549,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return sendResponse(
         await handleAccepted("leetcode", "LeetCode", async () => {
           let match = null;
+          let lookupError = null;
           for (let attempt = 0; attempt < 4 && !match; attempt++) {
-            const recent = await lc.fetchSubmissions(20).catch(() => []);
+            let recent = [];
+            try {
+              recent = await lc.fetchSubmissions(20);
+              lookupError = null;
+            } catch (error) {
+              lookupError = error;
+              if (error?.code !== "transient") throw error;
+            }
             match = incomingId
               ? recent.find((submission) => String(submission.id) === incomingId) || null
               : recent.find(
@@ -503,6 +569,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 ) || null;
             if (!match && attempt < 3) await new Promise((resolve) => setTimeout(resolve, 750));
           }
+          if (!match && lookupError) throw lookupError;
           if (!match || (incomingSlug && match.slug !== incomingSlug)) {
             throw new Error("LeetCode has not confirmed this accepted submission yet.");
           }
@@ -567,6 +634,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const title = textValue(msg.title, "GeeksforGeeks problem title");
       const difficulty = textValue(msg.difficulty, "GeeksforGeeks difficulty", 32);
       const language = textValue(msg.language, "GeeksforGeeks language", 100);
+      const capturedSource = sourceValue(msg.source);
       const suppliedUrl = textValue(msg.url, "GeeksforGeeks problem URL", 500);
       let problemUrl = "";
       if (suppliedUrl) {
@@ -585,7 +653,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
       return sendResponse(
         await handleAccepted("gfg", "GeeksforGeeks", async (config) => {
-          let source = await gfg.readEditorFromTab(sender.tab.id);
+          const currentSlug = (() => {
+            try {
+              return new URL(sender.url || "").pathname.match(
+                /\/(?:problems|problem)\/([A-Za-z0-9_-]+)/i,
+              )?.[1];
+            } catch {
+              return null;
+            }
+          })();
+          if (currentSlug && currentSlug.toLowerCase() !== slug.toLowerCase()) {
+            throw new Error("GeeksforGeeks moved to another problem before syncing completed.");
+          }
+          let source = capturedSource;
           if (!source || !source.trim()) {
             source = await gfg.fetchSource({
               slug,
@@ -686,6 +766,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const codechefHandle = textValue(msg.payload.codechefHandle, "CodeChef username", 64);
       const gfgHandle = textValue(msg.payload.gfgHandle, "GeeksforGeeks username", 64);
       const repo = textValue(msg.payload.repo, "repository name", 100);
+      const repoVisibilityConfirmed = msg.payload.repoVisibilityConfirmed === true;
       const platforms = isRecord(msg.payload.platforms) ? msg.payload.platforms : {};
       for (const name of ["codeforces", "leetcode", "cses", "codechef", "gfg"]) {
         if (Object.hasOwn(platforms, name) && typeof platforms[name] !== "boolean") {
@@ -702,6 +783,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         const repoError = gh.validateRepoName(repo);
         if (repoError) throw new Error(repoError);
+        if (!repoVisibilityConfirmed) {
+          throw new Error(
+            "Confirm that the solutions repository and committed files will be public.",
+          );
+        }
         for (const [value, label] of [
           [handle, "Codeforces handle"],
           [codechefHandle, "CodeChef username"],
@@ -762,6 +848,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           repo,
           owner,
           platforms: enabled,
+          repoVisibilityConfirmed: true,
           setupComplete: true,
           githubAuthInvalid: false,
         };

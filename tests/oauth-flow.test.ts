@@ -87,10 +87,14 @@ function request(
 
 const verifier = "v".repeat(43);
 const challenge = sha256Base64Url(verifier);
+const clientState = "s".repeat(43);
 
 const startResponse = new MockResponse();
 await startHandler(
-  request("GET", `/api/oauth/github/start?challenge=${challenge}`) as never,
+  request(
+    "GET",
+    `/api/oauth/github/start?challenge=${challenge}&client_state=${clientState}`,
+  ) as never,
   startResponse as never,
 );
 assert.equal(startResponse.status, 302);
@@ -110,6 +114,7 @@ const extensionCallbackUrl = new URL(callbackResponse.headers["Location"]!);
 assert.equal(extensionCallbackUrl.origin + extensionCallbackUrl.pathname, extensionRedirect);
 const exchangeCode = extensionCallbackUrl.searchParams.get("code");
 assert.ok(exchangeCode);
+assert.equal(extensionCallbackUrl.searchParams.get("state"), clientState);
 assert.notEqual(exchangeCode, githubToken);
 assert.equal(extensionCallbackUrl.searchParams.get("token"), null);
 assert.equal(githubExchangeCalls, 1);
@@ -149,9 +154,13 @@ assert.equal(wrongOriginResponse.status, 403);
 
 const secondVerifier = "w".repeat(43);
 const secondChallenge = sha256Base64Url(secondVerifier);
+const secondClientState = "t".repeat(43);
 const secondStartResponse = new MockResponse();
 await startHandler(
-  request("GET", `/api/oauth/github/start?challenge=${secondChallenge}`) as never,
+  request(
+    "GET",
+    `/api/oauth/github/start?challenge=${secondChallenge}&client_state=${secondClientState}`,
+  ) as never,
   secondStartResponse as never,
 );
 const secondState = new URL(secondStartResponse.headers["Location"]!).searchParams.get("state")!;
@@ -187,9 +196,13 @@ assert.equal(secondExchangeResponse.status, 200);
 
 const deniedVerifier = "d".repeat(43);
 const deniedChallenge = sha256Base64Url(deniedVerifier);
+const deniedClientState = "u".repeat(43);
 const deniedStartResponse = new MockResponse();
 await startHandler(
-  request("GET", `/api/oauth/github/start?challenge=${deniedChallenge}`) as never,
+  request(
+    "GET",
+    `/api/oauth/github/start?challenge=${deniedChallenge}&client_state=${deniedClientState}`,
+  ) as never,
   deniedStartResponse as never,
 );
 const deniedState = new URL(deniedStartResponse.headers["Location"]!).searchParams.get("state")!;
@@ -202,6 +215,10 @@ assert.equal(deniedResponse.status, 302);
 assert.equal(
   new URL(deniedResponse.headers["Location"]!).searchParams.get("error"),
   "oauth_denied",
+);
+assert.equal(
+  new URL(deniedResponse.headers["Location"]!).searchParams.get("state"),
+  deniedClientState,
 );
 
 const reusedDeniedStateResponse = new MockResponse();

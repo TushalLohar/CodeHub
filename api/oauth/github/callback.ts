@@ -52,14 +52,22 @@ export default async function handler(
       extensionError(config, response);
       return;
     }
-    const stateData = JSON.parse(stateValue) as { challenge?: string };
-    if (!stateData.challenge || !/^[A-Za-z0-9_-]{43,128}$/.test(stateData.challenge)) {
+    const stateData = JSON.parse(stateValue) as { challenge?: string; clientState?: string };
+    if (
+      !stateData.challenge ||
+      !/^[A-Za-z0-9_-]{43,128}$/.test(stateData.challenge) ||
+      !stateData.clientState ||
+      !/^[A-Za-z0-9_-]{43,128}$/.test(stateData.clientState)
+    ) {
       extensionError(config, response);
       return;
     }
 
     if (params.get("error")) {
-      redirect(response, `${config.extensionRedirectUrl}?error=oauth_denied`);
+      redirect(
+        response,
+        `${config.extensionRedirectUrl}?error=oauth_denied&state=${encodeURIComponent(stateData.clientState)}`,
+      );
       return;
     }
 
@@ -107,7 +115,10 @@ export default async function handler(
       extensionError(config, response);
       return;
     }
-    redirect(response, `${config.extensionRedirectUrl}?code=${encodeURIComponent(exchangeCode)}`);
+    redirect(
+      response,
+      `${config.extensionRedirectUrl}?code=${encodeURIComponent(exchangeCode)}&state=${encodeURIComponent(stateData.clientState)}`,
+    );
   } catch {
     extensionError(config, response);
   }

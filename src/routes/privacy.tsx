@@ -31,20 +31,22 @@ const sections = [
     body: [
       "SolveBase stores your selected coding-platform usernames, enabled-platform settings, GitHub repository name, synchronization state, and GitHub authorization token in Chrome extension storage on your device.",
       "When you submit a solution, SolveBase reads the accepted submission's source code and basic problem metadata from the supported coding platform so it can create or update the matching file in your GitHub repository.",
+      "For GeeksforGeeks, the editor text captured at the submit click may remain in Chrome session storage for up to fifteen minutes so the accepted verdict stays tied to the code that was actually submitted.",
     ],
   },
   {
     title: "How data moves",
     body: [
       "Accepted solution source code is sent directly from the extension to GitHub through GitHub's API. SolveBase does not send source code to its own backend and does not use it for analytics, advertising, profiling, or model training.",
-      "SolveBase never sends coding-platform cookie values to GitHub or to the SolveBase OAuth service. Chrome supplies those cookies only to requests made to the same coding platform that created them.",
+      "SolveBase reads only LeetCode's named CSRF cookie when LeetCode requires it as a request header. That value is never sent to GitHub or to the SolveBase OAuth service.",
       "The OAuth service at solvebase.dev performs the GitHub authorization exchange. OAuth state expires after five minutes, and the encrypted one-time token exchange expires after sixty seconds. The service also keeps short-lived rate-limit records to prevent abuse.",
+      "If the selected repository does not exist, SolveBase creates it as a public GitHub repository after the user explicitly confirms that choice. Accepted solution files committed there are publicly visible.",
     ],
   },
   {
     title: "Browser permissions",
     body: [
-      "Storage keeps settings and synchronization state. Identity opens the GitHub authorization flow. Cookies and scripting let SolveBase verify your signed-in sessions and read accepted source code on the supported coding sites. Alarms and notifications check GitHub authorization health and warn you when reconnection is required.",
+      "Storage keeps settings and synchronization state. Identity opens the GitHub authorization flow. The cookies permission reads only LeetCode's CSRF cookie. Scripting captures the user's submitted source on supported problem pages. Alarms and notifications check GitHub authorization health and warn when reconnection is required.",
     ],
   },
   {
@@ -63,6 +65,7 @@ const sections = [
     title: "Control and deletion",
     body: [
       "Disconnecting GitHub removes the saved GitHub authorization token from the extension. Resetting SolveBase removes its local settings, cached synchronization state, and connection data. Files already committed to GitHub remain in your repository until you delete them there.",
+      "Settings and repository synchronization state remain on the device until the user resets or uninstalls SolveBase. Submission deduplication records expire after thirty days, and temporary session witnesses expire after fifteen minutes or when the browser session ends.",
       "You can revoke SolveBase at any time from GitHub Settings under Applications.",
     ],
   },

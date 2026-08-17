@@ -14,6 +14,7 @@
     "test:github-auth": "node --experimental-strip-types tests/github-auth.test.ts",
     "test:oauth": "node --experimental-strip-types tests/oauth-flow.test.ts",
     "test:repository": "node --experimental-strip-types tests/repository-state.test.ts",
+    "test:release": "node --experimental-strip-types tests/release-regressions.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

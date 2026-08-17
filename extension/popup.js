@@ -18,6 +18,7 @@ const connectedPreviewState = {
     },
     setupComplete: true,
     hasToken: true,
+    repoVisibilityConfirmed: true,
   },
   session: { cfOk: true, lcOk: true, csesOk: true, codechefOk: true, gfgOk: true },
   projectRepoStarred: false,
@@ -26,12 +27,18 @@ const previewState =
   previewView === "setup"
     ? {
         config: {
-          handle: "Tushal_007",
-          codechefHandle: "tushallohar",
-          gfgHandle: "tushallohar",
+          handle: "",
+          codechefHandle: "",
+          gfgHandle: "",
           repo: "CP-Solutions",
           owner: "",
-          platforms: connectedPreviewState.config.platforms,
+          platforms: {
+            codeforces: false,
+            leetcode: true,
+            cses: true,
+            codechef: false,
+            gfg: false,
+          },
           setupComplete: false,
           hasToken: false,
         },
@@ -48,17 +55,36 @@ const send = previewMode
 let editing = false;
 let setupPopulated = false;
 
+const accountPlatformFields = [
+  ["platformCF", "handle"],
+  ["platformCodeChef", "codechefHandle"],
+  ["platformGFG", "gfgHandle"],
+];
+
+function syncAccountFieldStates() {
+  for (const [platformId, fieldId] of accountPlatformFields) {
+    const enabled = $(platformId).checked;
+    const field = $(fieldId);
+    field.disabled = !enabled;
+    field.setAttribute("aria-disabled", String(!enabled));
+  }
+}
+
 function populateForm(config) {
   if (!config) return;
   $("handle").value = config.handle || "";
   $("codechefHandle").value = config.codechefHandle || "";
   $("gfgHandle").value = config.gfgHandle || "";
   $("repo").value = config.repo || "CP-Solutions";
+  $("repoPublicConsent").checked = Boolean(
+    config.repoVisibilityConfirmed || config.setupComplete !== false,
+  );
   $("platformCF").checked = config.platforms?.codeforces !== false;
   $("platformLC").checked = config.platforms?.leetcode !== false;
   $("platformCSES").checked = config.platforms?.cses !== false;
   $("platformCodeChef").checked = config.platforms?.codechef !== false;
   $("platformGFG").checked = config.platforms?.gfg !== false;
+  syncAccountFieldStates();
 }
 
 function renderGithubStatus(config) {
@@ -264,12 +290,16 @@ function readSetupForm() {
   const codechefHandle = $("codechefHandle").value.trim();
   const gfgHandle = $("gfgHandle").value.trim();
   const repo = $("repo").value.trim();
+  const repoVisibilityConfirmed = $("repoPublicConsent").checked;
 
   if (!repo) {
     return { error: "Enter a repository name." };
   }
   if (!/^[A-Za-z0-9._-]+$/.test(repo) || repo === "." || repo === ".." || repo.length > 100) {
     return { error: "Invalid repository name. Use letters, numbers, hyphens, or dots." };
+  }
+  if (!repoVisibilityConfirmed) {
+    return { error: "Confirm that the solutions repository and committed files will be public." };
   }
 
   if (
@@ -290,7 +320,7 @@ function readSetupForm() {
   if (platforms.gfg && !gfgHandle) {
     return { error: "Enter your GeeksforGeeks username." };
   }
-  return { handle, codechefHandle, gfgHandle, repo, platforms };
+  return { handle, codechefHandle, gfgHandle, repo, platforms, repoVisibilityConfirmed };
 }
 
 async function submitSetup(forceConnect) {
@@ -337,6 +367,11 @@ async function submitSetup(forceConnect) {
 
 $("githubConnect").addEventListener("click", () => submitSetup(true));
 $("save").addEventListener("click", () => submitSetup(false));
+
+for (const [platformId] of accountPlatformFields) {
+  $(platformId).addEventListener("change", syncAccountFieldStates);
+}
+syncAccountFieldStates();
 
 $("starRepo").addEventListener("click", async () => {
   const button = $("starRepo");

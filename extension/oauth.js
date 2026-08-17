@@ -45,10 +45,12 @@ async function exchangeCode(code, verifier) {
 export async function connect() {
   const verifier = randomBase64Url();
   const challenge = await sha256Base64Url(verifier);
+  const flowState = randomBase64Url();
   const redirectUri = chrome.identity.getRedirectURL("github");
   const expectedRedirect = new URL(redirectUri);
   const startUrl = new URL(`${OAUTH_API_BASE}/api/oauth/github/start`);
   startUrl.searchParams.set("challenge", challenge);
+  startUrl.searchParams.set("client_state", flowState);
 
   const finalUrl = await chrome.identity.launchWebAuthFlow({
     url: startUrl.toString(),
@@ -63,6 +65,9 @@ export async function connect() {
   }
   const error = callback.searchParams.get("error");
   if (error) throw new Error("GitHub authorization was cancelled or failed.");
+  if (callback.searchParams.get("state") !== flowState) {
+    throw new Error("GitHub returned an authorization flow that SolveBase did not start.");
+  }
   const code = callback.searchParams.get("code") || "";
   if (!/^[A-Za-z0-9_-]{40,128}$/.test(code)) {
     throw new Error("GitHub did not return a valid authorization result.");

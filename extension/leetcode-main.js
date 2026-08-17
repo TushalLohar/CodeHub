@@ -162,7 +162,7 @@
   }
 
   function inspect(url, method, text) {
-    const relevant = isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
+    const relevant = isRelevantRequest(url, method);
     if (!text || text.length > MAX_RESPONSE_CHARS || !relevant) return;
 
     let data;
@@ -194,13 +194,13 @@
   if (typeof nativeFetch === "function") {
     window.fetch = function (...args) {
       const { url, method } = requestInfo(args[0], args[1]);
-      const shouldInspect =
-        isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
+      const shouldInspect = isRelevantRequest(url, method);
       if (isPotentialSubmissionStart(url, method)) {
         lastSubmitRequestAt = Date.now();
       }
       return nativeFetch.apply(this, args).then((response) => {
-        if (shouldInspect) {
+        const contentLength = Number(response.headers.get("content-length") || 0);
+        if (shouldInspect && (!contentLength || contentLength <= MAX_RESPONSE_CHARS)) {
           response
             .clone()
             .text()
@@ -222,7 +222,7 @@
   XMLHttpRequest.prototype.send = function (...args) {
     const url = this.__solvebaseLeetCodeUrl || "";
     const method = this.__solvebaseLeetCodeMethod || "GET";
-    const shouldInspect = isRelevantRequest(url, method) || isPotentialSubmissionStart(url, method);
+    const shouldInspect = isRelevantRequest(url, method);
     if (isPotentialSubmissionStart(url, method)) {
       lastSubmitRequestAt = Date.now();
     }

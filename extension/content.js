@@ -256,7 +256,11 @@
             language: info.language || undefined,
             source,
           });
-          if (response && (response.ok || response.queued)) {
+          if (response?.ok) {
+            clearPending();
+            return;
+          }
+          if (response?.retry === false) {
             clearPending();
             return;
           }

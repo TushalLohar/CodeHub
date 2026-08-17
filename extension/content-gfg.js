@@ -5,8 +5,8 @@
 // click stashes a "pending" record; scan() returns immediately without one, so
 // visiting an already-solved problem page never re-commits it. It fails CLOSED.
 //
-// Source code is read by the background worker from the editor (Monaco/Ace)
-// via scripting.executeScript in the page's MAIN world — see gfg.readEditorFromTab.
+// Source code is captured into the short-lived witness at the trusted submit
+// click, before the user can edit the buffer or navigate to another problem.
 
 (function () {
   "use strict";
@@ -192,9 +192,14 @@
             difficulty: current.difficulty,
             language: current.language,
             url: current.url,
+            source: current.source,
           });
-          if (response && (response.ok || response.queued)) {
+          if (response?.ok) {
             reported.add(key);
+            clearPending();
+            return;
+          }
+          if (response?.retry === false) {
             clearPending();
             return;
           }

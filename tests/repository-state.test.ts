@@ -20,6 +20,8 @@ const synced = indexRepositoryFiles([
   { type: "blob", path: "cses/sorting-and-searching/1640 - Sum of Two Values.cpp" },
   { type: "blob", path: "codechef/1000/FLOW001 - Add Two Numbers.java" },
   { type: "blob", path: "geeksforgeeks/Medium/Subset Sum.cpp" },
+  { type: "blob", path: "2024/notes/main.py" },
+  { type: "blob", path: "1400/notes.py" },
   { type: "blob", path: "codeforces/1400/notes.md" },
   { type: "tree", path: "codeforces/1400" },
 ]) as unknown as SyncedIndex;
@@ -45,10 +47,12 @@ assert.match(updated, /\*\*Total solved: 0\*\*/);
 assert.doesNotMatch(updated, /\*\*Total solved: 6\*\*/);
 
 const migrated = mergeReadme(
-  "<!-- cf-sync -->\n# Old managed README\n\n**Total solved: 1**\n",
+  "# Personal notes\n\nKeep this text.\n\n<!-- cf-sync -->\n# Old managed README\n\n**Total solved: 1**\n",
   generated,
 );
 assert.doesNotMatch(migrated, /Old managed README/);
+assert.match(migrated, /^# Personal notes/);
+assert.match(migrated, /Keep this text\./);
 assert.match(migrated, /\*\*Total solved: 6\*\*/);
 
 const requests: string[] = [];

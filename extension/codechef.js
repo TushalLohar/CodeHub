@@ -91,8 +91,57 @@ export async function handleExists(handle) {
   }
 }
 
-export function checkSession() {
-  return { ok: true, error: null };
+export async function checkSession() {
+  if (chrome.tabs?.query && chrome.scripting?.executeScript) {
+    try {
+      const tabs = await chrome.tabs.query({
+        url: ["https://*.codechef.com/*", "https://codechef.com/*"],
+      });
+      const tab =
+        tabs.find((entry) => Number.isInteger(entry.id) && entry.status === "complete") ||
+        tabs.find((entry) => Number.isInteger(entry.id));
+      if (tab) {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: "MAIN",
+          func: () => {
+            const signedIn = Boolean(
+              document.querySelector(
+                "a[href*='logout'], a[href*='/users/'], [class*='profile'] img, [class*='avatar'] img",
+              ),
+            );
+            const signedOut = Boolean(
+              document.querySelector("a[href*='/login'], a[href*='accounts/login']"),
+            );
+            return { signedIn, signedOut };
+          },
+        });
+        const status = results?.[0]?.result;
+        if (status?.signedIn) return { ok: true, error: null };
+        if (status?.signedOut && !status.signedIn) {
+          return { ok: false, error: "Not signed in to CodeChef" };
+        }
+      }
+    } catch {
+      // Fall through to the authenticated homepage probe.
+    }
+  }
+
+  try {
+    const response = await fetch(`${CODECHEF}/`, {
+      credentials: "include",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+    });
+    if (response.status >= 500 || response.status === 403) return { ok: true, error: null };
+    const html = await response.text();
+    if (/href=["'][^"']*logout/i.test(html)) return { ok: true, error: null };
+    if (/href=["'][^"']*(?:login|accounts\/login)/i.test(html)) {
+      return { ok: false, error: "Not signed in to CodeChef" };
+    }
+    return { ok: true, error: null };
+  } catch {
+    return { ok: true, error: null };
+  }
 }
 
 const metaCache = new Map();

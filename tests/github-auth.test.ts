@@ -120,6 +120,9 @@ nextResponse = Response.json(
 );
 assert.deepEqual(await github.verifyToken("active-token"), { login: "TushalLohar" });
 
+nextResponse = Response.json({ login: "TushalLohar" }, { headers: { "x-oauth-scopes": "repo" } });
+await assert.rejects(github.verifyToken("broad-token"), /GitHub granted private-repository access/);
+
 nextResponse = new Response(null, { status: 204 });
 assert.deepEqual(await github.starRepository("active-token", "TushalLohar", "SolveBase"), {
   starred: true,

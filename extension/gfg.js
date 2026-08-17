@@ -66,7 +66,7 @@ function normalizeDifficulty(diff) {
   return hit || "Easy";
 }
 
-// The filename stem is also the deduplication key used by the sync engine.
+// The title is used only for the human-readable filename.
 function keyFor(sub) {
   return sanitizeName(sub.title || sub.name || sub.slug || String(sub.id));
 }
@@ -149,28 +149,42 @@ export async function checkSession() {
   // should not be shown a red "session expired" banner for it.
   if (!config?.gfgHandle) return { ok: true, error: null };
 
-  if (chrome.cookies?.getAll) {
+  if (chrome.tabs?.query && chrome.scripting?.executeScript) {
     try {
-      const cookies = await chrome.cookies.getAll({ domain: "geeksforgeeks.org" });
-      const signedIn = cookies.some(
-        (c) =>
-          c.value &&
-          ["gfg_id", "gfg_session", "auth_token", "gfguser", "gfg_username", "sessionid"].includes(
-            c.name,
-          ),
-      );
-      if (signedIn) return { ok: true, error: null };
+      const tabs = await chrome.tabs.query({
+        url: ["https://*.geeksforgeeks.org/*", "https://geeksforgeeks.org/*"],
+      });
+      const tab =
+        tabs.find((entry) => Number.isInteger(entry.id) && entry.status === "complete") ||
+        tabs.find((entry) => Number.isInteger(entry.id));
+      if (tab) {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: "MAIN",
+          func: () => {
+            const signedIn = Boolean(
+              document.querySelector(
+                "a[href*='logout'], a[href*='/user/'], [class*='profile'] img, [class*='avatar'] img",
+              ),
+            );
+            const signedOut = Boolean(
+              document.querySelector("a[href*='auth.geeksforgeeks.org'], a[href*='/login']"),
+            );
+            return { signedIn, signedOut };
+          },
+        });
+        const status = results?.[0]?.result;
+        if (status?.signedIn) return { ok: true, error: null };
+        if (status?.signedOut && !status.signedIn) {
+          return {
+            ok: false,
+            error: "Sign in to GeeksforGeeks so SolveBase can read your solutions",
+          };
+        }
+        return { ok: true, error: null };
+      }
     } catch {
-      // Fall through to the tab check.
-    }
-  }
-
-  if (chrome.tabs?.query) {
-    try {
-      const tabs = await chrome.tabs.query({ url: ["*://*.geeksforgeeks.org/*"] });
-      if (tabs.length) return { ok: true, error: null };
-    } catch {
-      // Fall through.
+      return { ok: true, error: null };
     }
   }
 
@@ -314,7 +328,7 @@ export const PLATFORM = {
     return {
       platform: "gfg",
       id: String(sub.id || slug),
-      key: title,
+      key: String(slug).toLowerCase(),
       title,
       difficulty,
       language,

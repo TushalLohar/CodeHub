@@ -93,7 +93,7 @@
           <div class="section-heading">
             <div>
               <h1>Settings</h1>
-              <p>Configure repository and platform handles.</p>
+              <p>Configure repository and optional platform accounts.</p>
             </div>
             <button id="cancelEdit" type="button" class="text-button cancel-btn hidden">Cancel</button>
           </div>
@@ -118,6 +118,13 @@
               <label for="repo">Repository name</label>
               <input id="repo" value="CP-Solutions" placeholder="CP-Solutions" autocomplete="off" spellcheck="false" />
             </div>
+            <label class="repo-disclosure" for="repoPublicConsent">
+              <input id="repoPublicConsent" type="checkbox" />
+              <span>
+                Create this as a public GitHub repository if it does not exist. Accepted solutions
+                committed there will be publicly visible.
+              </span>
+            </label>
           </div>
 
           <div class="setup-card">
@@ -154,7 +161,7 @@
             <legend>Active platforms</legend>
             <div class="platforms-grid">
               <label class="platform-toggle">
-                <input id="platformCF" type="checkbox" checked />
+                <input id="platformCF" type="checkbox" />
                 <span class="platform-control">
                   <span class="platform-ctrl-left">
                     <img src="icons/codeforces.svg" alt="" />
@@ -184,7 +191,7 @@
                 </span>
               </label>
               <label class="platform-toggle">
-                <input id="platformCodeChef" type="checkbox" checked />
+                <input id="platformCodeChef" type="checkbox" />
                 <span class="platform-control">
                   <span class="platform-ctrl-left">
                     <img src="icons/codechef.svg" alt="" />
@@ -194,7 +201,7 @@
                 </span>
               </label>
               <label class="platform-toggle platform-toggle-wide">
-                <input id="platformGFG" type="checkbox" checked />
+                <input id="platformGFG" type="checkbox" />
                 <span class="platform-control">
                   <span class="platform-ctrl-left">
                     <img src="icons/geeksforgeeks.svg" alt="" />

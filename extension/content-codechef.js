@@ -5,6 +5,7 @@
   window.__solvebaseCodeChefContentInstalled = true;
 
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
+  const RETRY_DELAYS = [0, 2000, 4000, 8000, 16000, 30000, 60000, 120000];
   const reported = new Set();
   const reporting = new Set();
   let lastTrustedSubmitAt = 0;
@@ -86,7 +87,8 @@
     if (reported.has(id) || reporting.has(id)) return;
     reporting.add(id);
     try {
-      for (let attempt = 0; attempt < 6; attempt += 1) {
+      for (const delay of RETRY_DELAYS) {
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
         try {
           const response = await chrome.runtime.sendMessage({
             type: "codechef-accepted",
@@ -94,12 +96,12 @@
             problemCode: problemCode || undefined,
             submittedAt,
           });
-          if (response?.ok || response?.queued) {
+          if (response?.ok) {
             reported.add(id);
             return;
           }
+          if (response?.retry === false) return;
         } catch {}
-        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     } finally {
       reporting.delete(id);

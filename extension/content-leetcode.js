@@ -5,6 +5,7 @@
   window.__solvebaseLeetCodeContentInstalled = true;
 
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
+  const RETRY_DELAYS = [0, 1500, 3000, 6000, 12000, 30000, 60000, 120000];
   const seen = new Set();
   const reporting = new Set();
   let lastTrustedSubmitAt = 0;
@@ -72,7 +73,8 @@
     if (seen.has(key) || reporting.has(key)) return;
     reporting.add(key);
     try {
-      for (let attempt = 0; attempt < 6; attempt += 1) {
+      for (const delay of RETRY_DELAYS) {
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
         try {
           const response = await chrome.runtime.sendMessage({
             type: "lc-accepted",
@@ -80,12 +82,12 @@
             slug: slug || undefined,
             submittedAt,
           });
-          if (response?.ok || response?.queued) {
+          if (response?.ok) {
             seen.add(key);
             return;
           }
+          if (response?.retry === false) return;
         } catch {}
-        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
     } finally {
       reporting.delete(key);

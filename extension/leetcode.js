@@ -327,7 +327,8 @@ export const PLATFORM = {
     const language = details.lang?.name || details.lang?.verboseName || sub.language || "";
     const ext = extFor(language);
     const name = sanitizeName(title);
-    const number = q.questionFrontendId || sub.problemId || "";
+    const rawNumber = q.questionFrontendId || sub.problemId || "";
+    const number = rawNumber ? sanitizeName(String(rawNumber)) : "";
     return {
       platform: "leetcode",
       id: String(sub.id),

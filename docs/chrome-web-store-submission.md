@@ -15,7 +15,7 @@ Short description:
 
 Detailed description:
 
-> SolveBase keeps your competitive-programming work organized without interrupting your problem-solving flow.
+> SolveBase archives your own accepted competitive-programming solutions to your own GitHub repository automatically when they are accepted.
 >
 > After you connect GitHub and choose a repository, SolveBase detects newly accepted submissions on Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks. It saves the source code directly to GitHub using consistent platform-specific folders and maintains a summary of your solved problems.
 >
@@ -31,24 +31,26 @@ Detailed description:
 > - Session and GitHub authorization health warnings
 >
 > SolveBase sends solution source code directly from the extension to GitHub. It does not send source code to its own backend or use it for advertising, analytics, profiling, or model training.
+>
+> If the selected repository does not exist, SolveBase creates it as a public repository only after you explicitly confirm that its committed solution files will be publicly visible.
 
 ## Single Purpose
 
-> SolveBase detects a user's newly accepted submissions on supported coding platforms and saves those solutions, with basic problem metadata, to the GitHub repository selected by the user.
+> SolveBase archives a user's own accepted competitive-programming solutions to their own GitHub repository automatically when the solution is accepted.
 
 ## Permission Justifications
 
 ### `storage`
 
-Stores the user's selected repository, platform usernames, enabled-platform preferences, GitHub OAuth token, synchronization index, and connection-health state locally in Chrome extension storage.
+Stores the user's selected repository, platform usernames, enabled-platform preferences, GitHub OAuth token, synchronization index, and connection-health state locally in trusted Chrome extension storage. Settings remain until reset or uninstall, deduplication entries expire after thirty days, and short-lived submission witnesses expire after fifteen minutes.
 
 ### `cookies`
 
-Reads authentication and CSRF cookies only for supported coding platforms. This is required to verify the user's signed-in session and retrieve the user's own accepted solution source where the platform requires authenticated requests. Cookie values are never sent to GitHub or to the SolveBase OAuth service.
+Reads only LeetCode's named `csrftoken` cookie. LeetCode requires that value as a CSRF request header when the extension requests the signed-in user's own accepted submissions. SolveBase does not enumerate cookies, read unrelated cookie values, or send cookie data to GitHub or the SolveBase OAuth service.
 
 ### `scripting`
 
-Runs narrowly scoped functions on supported coding-platform tabs to read source code from page-owned editors or authenticated submission endpoints when isolated extension scripts cannot access that page state directly.
+Runs narrowly scoped packaged functions on supported coding-platform problem tabs to capture the source code the user submitted or retrieve that accepted submission from the site's authenticated endpoint. It does not inject downloaded or remotely hosted code.
 
 ### `identity`
 
@@ -72,10 +74,10 @@ Displays a reconnect notification when GitHub authorization is no longer valid. 
 
 Declare that the extension handles:
 
-- Authentication information: the GitHub OAuth token and supported-site session cookies.
+- Authentication information: the GitHub OAuth token and LeetCode's named CSRF cookie.
 - Personally identifiable information: GitHub username and coding-platform usernames supplied by the user.
 - Website content: accepted solution source code and problem metadata from supported platforms.
 
 The data is used only for the extension's single purpose. It is not sold, used for advertising, used for credit decisions, or transferred for unrelated purposes. Solution source code is sent directly to GitHub and not to the SolveBase OAuth backend.
 
-
+New repositories are public and are created only after the setup screen explicitly confirms that committed solution files will be publicly visible. SolveBase requests GitHub's `public_repo` OAuth scope only and does not request access to private repositories.

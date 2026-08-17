@@ -125,7 +125,12 @@ export async function verifyToken(token) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!scopes.includes("repo") && !scopes.includes("public_repo")) {
+  if (scopes.includes("repo")) {
+    throw new Error(
+      "GitHub granted private-repository access. Revoke SolveBase in GitHub settings, then reconnect so it receives public-repository access only.",
+    );
+  }
+  if (!scopes.includes("public_repo")) {
     throw new Error("GitHub authorization is missing public repository access");
   }
   if (typeof user.login !== "string" || !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(user.login)) {
@@ -194,7 +199,14 @@ function repositorySolution(path) {
   let folder = parts[1] || "";
 
   // Older Codeforces repositories commonly put rating folders at the root.
-  if (!platform && /^(?:\d{2,5}|unrated)$/i.test(parts[0]) && parts.length >= 2) {
+  const legacyRating = Number(parts[0]);
+  const legacyCodeforcesRoot =
+    /^unrated$/i.test(parts[0]) ||
+    (Number.isInteger(legacyRating) &&
+      legacyRating >= 500 &&
+      legacyRating <= 4000 &&
+      legacyRating % 100 === 0);
+  if (!platform && legacyCodeforcesRoot && parts.length >= 2) {
     platform = "codeforces";
     folder = parts[0];
   } else if (platform && parts.length < 3) {
@@ -208,6 +220,7 @@ function repositorySolution(path) {
 
   const stem = filename.slice(0, dot).trim();
   if (!stem) return null;
+  if (!PLATFORM_ROOTS[root] && !/^\S+\s+-\s+\S/.test(stem)) return null;
   const separator = stem.indexOf(" - ");
   const title = separator > 0 ? stem.slice(separator + 3).trim() || stem : stem;
   const problemKey = importedProblemKey(platform, stem, path);
@@ -284,6 +297,11 @@ export async function ensureRepo(token, owner, repo) {
   }
   if (!res.ok) throwHttpError(res, "inspect repository");
   const repository = await res.json();
+  if (repository?.private === true) {
+    throw new Error(
+      "SolveBase uses public-repository access only. Choose a public repository or make this repository public first.",
+    );
+  }
 
   const contents = await gh(token, contentsPath(owner, repo));
   if (contents.status === 404) return { created: false, adopted: true, synced: {} };
@@ -398,7 +416,7 @@ export function mergeReadme(existingContent, generatedContent) {
   const start = existing.indexOf(README_MARKER);
   if (start >= 0) {
     const end = existing.indexOf(README_END_MARKER, start);
-    if (end < 0) return `${generated}\n`;
+    if (end < 0) return `${existing.slice(0, start)}${generated}\n`;
     const suffix = existing.slice(end + README_END_MARKER.length);
     return `${existing.slice(0, start)}${generated}${suffix}`.replace(/\s*$/, "\n");
   }

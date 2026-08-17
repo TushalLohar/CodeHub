@@ -213,7 +213,7 @@
   }
 
   function inspect(url, method, text) {
-    const relevant = isSubmissionRequest(url) || isPotentialSubmissionStart(url, method);
+    const relevant = isSubmissionRequest(url);
     if (!relevant || !text || text.length > MAX_RESPONSE_CHARS) return;
     try {
       handlePayload(JSON.parse(text), url);
@@ -225,9 +225,10 @@
     window.fetch = function (...args) {
       const { url, method } = requestInfo(args[0], args[1]);
       noteSubmissionStart(url, method);
-      const shouldInspect = isSubmissionRequest(url) || isPotentialSubmissionStart(url, method);
+      const shouldInspect = isSubmissionRequest(url);
       return nativeFetch.apply(this, args).then((response) => {
-        if (shouldInspect) {
+        const contentLength = Number(response.headers.get("content-length") || 0);
+        if (shouldInspect && (!contentLength || contentLength <= MAX_RESPONSE_CHARS)) {
           response
             .clone()
             .text()
@@ -250,7 +251,7 @@
     const url = this.__solvebaseCodeChefUrl || "";
     const method = this.__solvebaseCodeChefMethod || "GET";
     noteSubmissionStart(url, method);
-    if (isSubmissionRequest(url) || isPotentialSubmissionStart(url, method)) {
+    if (isSubmissionRequest(url)) {
       this.addEventListener("load", () => inspect(url, method, this.responseText), { once: true });
     }
     return nativeSend.apply(this, args);

@@ -39,7 +39,11 @@ export default async function handler(
   try {
     await enforceRateLimit("start", clientIp(request), 60, 600);
     const challenge = requestUrl(request).searchParams.get("challenge") || "";
-    if (!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)) {
+    const clientState = requestUrl(request).searchParams.get("client_state") || "";
+    if (
+      !/^[A-Za-z0-9_-]{43,128}$/.test(challenge) ||
+      !/^[A-Za-z0-9_-]{43,128}$/.test(clientState)
+    ) {
       redirect(response, `${config.extensionRedirectUrl}?error=invalid_challenge`);
       return;
     }
@@ -47,7 +51,7 @@ export default async function handler(
     const state = randomToken();
     const stored = await setJson(
       `solvebase:oauth:state:${sha256(state)}`,
-      { challenge },
+      { challenge, clientState },
       OAUTH_STATE_TTL,
     );
     if (!stored) {

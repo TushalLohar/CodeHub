@@ -109,15 +109,13 @@ async function writeOnce(config, platformName, submission) {
   );
 
   if (stale) {
-    await gh
-      .deleteFile(
-        config.token,
-        config.owner,
-        config.repo,
-        stale.path,
-        `Move ${stale.title || syncedKey} to ${meta.path}`,
-      )
-      .catch(() => {});
+    await gh.deleteFile(
+      config.token,
+      config.owner,
+      config.repo,
+      stale.path,
+      `Move ${stale.title || syncedKey} to ${meta.path}`,
+    );
   }
 
   const synced = await store.get(store.KEYS.synced, {});
@@ -149,11 +147,11 @@ async function writeOnce(config, platformName, submission) {
  * re-send.
  */
 export async function processLive(platformName, submission) {
-  const config = await store.getConfig();
-  if (!config) return { outcome: "unconfigured" };
   if (!submission || !submission.id) return { outcome: "failed", error: "Missing submission id" };
 
   return runExclusive(async () => {
+    const config = await store.getConfig();
+    if (!config) return { outcome: "unconfigured" };
     if (await wasProcessed(platformName, submission.id)) return { outcome: "duplicate" };
     let lastError = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -175,6 +173,11 @@ export async function processLive(platformName, submission) {
         }
       }
     }
-    return { outcome: "failed", error: lastError ? lastError.message : "unknown error" };
+    return {
+      outcome: "failed",
+      error: lastError ? lastError.message : "unknown error",
+      code: lastError?.code || "unknown",
+      ...(Number.isFinite(lastError?.retryAfter) ? { retryAfter: lastError.retryAfter } : {}),
+    };
   });
 }

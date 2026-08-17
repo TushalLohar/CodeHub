@@ -129,8 +129,12 @@
             taskId,
             name: getProblemName(),
           });
-          if (response && (response.ok || response.queued)) {
+          if (response?.ok) {
             seen.add(key);
+            clearPending();
+            return;
+          }
+          if (response?.retry === false) {
             clearPending();
             return;
           }

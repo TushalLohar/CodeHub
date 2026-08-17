@@ -432,13 +432,13 @@ async function fetchSource(sub) {
   });
 }
 
-// Resilient session check for Codeforces that checks open tabs, cookies, and network.
+// Resilient session check for Codeforces that checks an open tab, then the site itself.
 export async function checkSession() {
   // 1. Try checking via open Codeforces tab if available
   if (chrome.tabs?.query && chrome.scripting?.executeScript) {
     try {
       const tabs = await chrome.tabs.query({
-        url: ["*://*.codeforces.com/*", "*://codeforces.com/*"],
+        url: ["https://codeforces.com/*"],
       });
       const tab =
         tabs.find((t) => Number.isInteger(t.id) && t.status === "complete") ||
@@ -466,26 +466,11 @@ export async function checkSession() {
         }
       }
     } catch {
-      // Tab check failed, fall through to cookies and fetch
+      // Tab check failed, fall through to the network probe.
     }
   }
 
-  // 2. Check cookies
-  if (chrome.cookies?.getAll) {
-    try {
-      const cookies = await chrome.cookies.getAll({ domain: "codeforces.com" });
-      const hasSession = cookies.some((c) =>
-        ["JSESSIONID", "39ce7", "rememberMe", "userbox", "CFID", "CFTOKEN"].includes(c.name),
-      );
-      if (hasSession) {
-        return { ok: true, error: null };
-      }
-    } catch {
-      // Fall through
-    }
-  }
-
-  // 3. Direct fetch fallback
+  // Direct fetch fallback
   try {
     const res = await fetch("https://codeforces.com/", {
       credentials: "include",

@@ -812,6 +812,28 @@ legend {
   padding-top: 6px;
 }
 
+.repo-disclosure {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.repo-disclosure input {
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  min-height: 14px;
+  margin: 1px 0 0;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -851,6 +873,12 @@ input {
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease;
+}
+
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  background: #f5f2fb;
 }
 
 input::placeholder {

@@ -311,7 +311,7 @@ export async function checkSession() {
       profileUrl: `${LC}/u/${encodeURIComponent(user)}/`,
     };
   } catch (e) {
-    return { ok: false, error: e.message };
+    return e?.code === "auth" ? { ok: false, error: e.message } : { ok: null, error: null };
   }
 }
 

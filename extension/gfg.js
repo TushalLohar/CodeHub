@@ -184,41 +184,33 @@ export async function checkSession() {
       const tabs = await chrome.tabs.query({
         url: ["https://*.geeksforgeeks.org/*", "https://geeksforgeeks.org/*"],
       });
-      const tab =
-        tabs.find((entry) => Number.isInteger(entry.id) && entry.status === "complete") ||
-        tabs.find((entry) => Number.isInteger(entry.id));
-      if (tab) {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: "MAIN",
-          func: () => {
-            const signedIn = Boolean(
-              document.querySelector(
-                "a[href*='logout'], a[href*='/user/'], [class*='profile'] img, [class*='avatar'] img",
-              ),
-            );
-            const signedOut = Boolean(
-              document.querySelector("a[href*='auth.geeksforgeeks.org'], a[href*='/login']"),
-            );
-            return { signedIn, signedOut };
-          },
-        });
-        const status = results?.[0]?.result;
-        if (status?.signedIn) return { ok: true, error: null };
-        if (status?.signedOut && !status.signedIn) {
-          return {
-            ok: false,
-            error: "Sign in to GeeksforGeeks so SolveBase can read your solutions",
-          };
-        }
-        return { ok: true, error: null };
-      }
+      const statuses = await Promise.all(
+        tabs
+          .filter((entry) => Number.isInteger(entry.id))
+          .map((tab) =>
+            chrome.scripting
+              .executeScript({
+                target: { tabId: tab.id },
+                world: "MAIN",
+                func: () => ({
+                  signedIn: Boolean(
+                    document.querySelector(
+                      "a[href*='logout'], a[href*='/user/'], [class*='profile'] img, [class*='avatar'] img",
+                    ),
+                  ),
+                }),
+              })
+              .then((results) => results?.[0]?.result || null)
+              .catch(() => null),
+          ),
+      );
+      if (statuses.some((status) => status?.signedIn)) return { ok: true, error: null };
     } catch {
-      return { ok: true, error: null };
+      return { ok: null, error: null };
     }
   }
 
-  return { ok: false, error: "Sign in to GeeksforGeeks so SolveBase can read your solutions" };
+  return { ok: null, error: null };
 }
 
 // Reads the editor's own model instead of the rendered DOM. Monaco virtualizes:

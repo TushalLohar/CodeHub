@@ -85,6 +85,10 @@ function isSessionActive(html) {
   return /href=["'][^"']*\/logout["']|Logout<\/a>/i.test(html || "");
 }
 
+function isSessionInactive(html) {
+  return /<form[^>]+action=["'][^"']*\/login|href=["'][^"']*\/login["']/i.test(html || "");
+}
+
 // Fetch a CSES page with session cookies from background worker.
 async function csesGet(path) {
   const url = path.startsWith("http") ? path : `${CSES}${path}`;
@@ -157,13 +161,14 @@ export async function checkSession() {
     const html = await getPageHtml("/problemset/");
     const ok = isSessionActive(html);
     const profilePath = ok ? html.match(/href=["'](\/user\/\d+)["']/i)?.[1] : null;
+    if (!ok && !isSessionInactive(html)) return { ok: null, error: null };
     return {
       ok,
       error: ok ? null : "Not signed in to CSES",
       profileUrl: profilePath ? `${CSES}${profilePath}` : null,
     };
   } catch (e) {
-    return { ok: false, error: e.message };
+    return e?.code === "auth" ? { ok: false, error: e.message } : { ok: null, error: null };
   }
 }
 

@@ -16,6 +16,7 @@
     "test:repository": "node --experimental-strip-types tests/repository-state.test.ts",
     "test:codeforces-final": "node --experimental-strip-types tests/codeforces-final.test.ts",
     "test:gfg-watch": "node --experimental-strip-types tests/gfg-watch.test.ts",
+    "test:sessions": "node --experimental-strip-types tests/session-health.test.ts",
     "test:pending": "node --experimental-strip-types tests/pending-sync.test.ts",
     "test:sync-speed": "node --experimental-strip-types tests/sync-speed.test.ts",
     "test:release": "node --experimental-strip-types tests/release-regressions.test.ts",

@@ -455,30 +455,27 @@ export async function checkSession() {
       const tabs = await chrome.tabs.query({
         url: ["https://codeforces.com/*"],
       });
-      const tab =
-        tabs.find((t) => Number.isInteger(t.id) && t.status === "complete") ||
-        tabs.find((t) => Number.isInteger(t.id));
-      if (tab) {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: "MAIN",
-          func: () => {
-            const hasLogout = Boolean(
-              document.querySelector("a[href*='logout'], a[href*='/logout']"),
-            );
-            const hasLogin = Boolean(document.querySelector("a[href*='enter'], a[href*='/enter']"));
-            const hasProfile = Boolean(
-              document.querySelector(".lang-chooser a[href*='/profile/']"),
-            );
-            return { hasLogout, hasLogin, hasProfile };
-          },
-        });
-        const res = results?.[0]?.result;
-        if (res) {
-          if (res.hasLogout || res.hasProfile) return { ok: true, error: null };
-          if (res.hasLogin && !res.hasLogout)
-            return { ok: false, error: "Not signed in to Codeforces" };
-        }
+      const statuses = await Promise.all(
+        tabs
+          .filter((tab) => Number.isInteger(tab.id))
+          .map((tab) =>
+            chrome.scripting
+              .executeScript({
+                target: { tabId: tab.id },
+                world: "MAIN",
+                func: () => ({
+                  hasLogout: Boolean(
+                    document.querySelector("a[href*='logout'], a[href*='/logout']"),
+                  ),
+                  hasProfile: Boolean(document.querySelector(".lang-chooser a[href*='/profile/']")),
+                }),
+              })
+              .then((results) => results?.[0]?.result || null)
+              .catch(() => null),
+          ),
+      );
+      if (statuses.some((status) => status?.hasLogout || status?.hasProfile)) {
+        return { ok: true, error: null };
       }
     } catch {
       // Tab check failed, fall through to the network probe.
@@ -494,18 +491,22 @@ export async function checkSession() {
     });
     // Cloudflare anti-bot challenge returns 403/503 from background workers.
     // This is NOT an auth failure, so treat as OK to prevent false-positive warning banners.
-    if (res.status === 403 || res.status === 503) {
-      return { ok: true, error: null };
+    if (res.status === 401) return { ok: false, error: "Not signed in to Codeforces" };
+    if (res.status === 403 || res.status === 429 || res.status >= 500) {
+      return { ok: null, error: null };
     }
     const html = await res.text();
     if (INTERSTITIAL.test(html)) {
-      return { ok: true, error: null };
+      return { ok: null, error: null };
     }
-    const ok = /\/logout|Logout/i.test(html);
-    return { ok, error: ok ? null : "Not signed in to Codeforces" };
+    if (/\/logout|Logout/i.test(html)) return { ok: true, error: null };
+    if (/handleOrEmail|href=["'][^"']*\/enter/i.test(html)) {
+      return { ok: false, error: "Not signed in to Codeforces" };
+    }
+    return { ok: null, error: null };
   } catch {
     // Network or timeout errors should not trigger a "session expired" banner
-    return { ok: true, error: null };
+    return { ok: null, error: null };
   }
 }
 

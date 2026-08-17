@@ -97,31 +97,27 @@ export async function checkSession() {
       const tabs = await chrome.tabs.query({
         url: ["https://*.codechef.com/*", "https://codechef.com/*"],
       });
-      const tab =
-        tabs.find((entry) => Number.isInteger(entry.id) && entry.status === "complete") ||
-        tabs.find((entry) => Number.isInteger(entry.id));
-      if (tab) {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          world: "MAIN",
-          func: () => {
-            const signedIn = Boolean(
-              document.querySelector(
-                "a[href*='logout'], a[href*='/users/'], [class*='profile'] img, [class*='avatar'] img",
-              ),
-            );
-            const signedOut = Boolean(
-              document.querySelector("a[href*='/login'], a[href*='accounts/login']"),
-            );
-            return { signedIn, signedOut };
-          },
-        });
-        const status = results?.[0]?.result;
-        if (status?.signedIn) return { ok: true, error: null };
-        if (status?.signedOut && !status.signedIn) {
-          return { ok: false, error: "Not signed in to CodeChef" };
-        }
-      }
+      const statuses = await Promise.all(
+        tabs
+          .filter((entry) => Number.isInteger(entry.id))
+          .map((tab) =>
+            chrome.scripting
+              .executeScript({
+                target: { tabId: tab.id },
+                world: "MAIN",
+                func: () => ({
+                  signedIn: Boolean(
+                    document.querySelector(
+                      "a[href*='logout'], a[href*='/users/'], [class*='profile'] img, [class*='avatar'] img",
+                    ),
+                  ),
+                }),
+              })
+              .then((results) => results?.[0]?.result || null)
+              .catch(() => null),
+          ),
+      );
+      if (statuses.some((status) => status?.signedIn)) return { ok: true, error: null };
     } catch {
       // Fall through to the authenticated homepage probe.
     }
@@ -132,15 +128,18 @@ export async function checkSession() {
       credentials: "include",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
-    if (response.status >= 500 || response.status === 403) return { ok: true, error: null };
+    if (response.status === 401) return { ok: false, error: "Not signed in to CodeChef" };
+    if (response.status === 403 || response.status === 429 || response.status >= 500) {
+      return { ok: null, error: null };
+    }
     const html = await response.text();
     if (/href=["'][^"']*logout/i.test(html)) return { ok: true, error: null };
     if (/href=["'][^"']*(?:login|accounts\/login)/i.test(html)) {
       return { ok: false, error: "Not signed in to CodeChef" };
     }
-    return { ok: true, error: null };
+    return { ok: null, error: null };
   } catch {
-    return { ok: true, error: null };
+    return { ok: null, error: null };
   }
 }
 

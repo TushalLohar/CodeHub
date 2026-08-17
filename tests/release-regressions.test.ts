@@ -10,6 +10,7 @@ const manifest = JSON.parse(read("extension/manifest.json")) as {
 
 assert.equal(manifest.version, "1.0.0");
 assert.equal(manifest.minimum_chrome_version, "112");
+assert.equal(Object.hasOwn(manifest, "key"), false);
 
 const mainWorldScripts = manifest.content_scripts.filter((script) => script.world === "MAIN");
 assert.ok(mainWorldScripts.length > 0);

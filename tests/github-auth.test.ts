@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
 
 const local = new Map<string, unknown>();
@@ -33,17 +32,11 @@ Object.assign(globalThis, {
 });
 
 const manifest = JSON.parse(fs.readFileSync("extension/manifest.json", "utf8")) as {
-  key: string;
+  key?: string;
 };
-const digest = crypto
-  .createHash("sha256")
-  .update(Buffer.from(manifest.key, "base64"))
-  .digest()
-  .subarray(0, 16);
-const alphabet = "abcdefghijklmnop";
-const extensionId = [...digest]
-  .map((byte) => (alphabet[byte >> 4] ?? "") + (alphabet[byte & 15] ?? ""))
-  .join("");
+assert.equal(manifest.key, undefined);
+
+const extensionId = "mdceoheaomlhiijololigpfbpiplicda";
 
 Object.assign(process.env, {
   GITHUB_CLIENT_ID: "test-client-id",
@@ -52,6 +45,8 @@ Object.assign(process.env, {
   KV_REST_API_URL: "https://redis.test",
   KV_REST_API_TOKEN: "test-redis-token",
   TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 3).toString("base64"),
+  EXTENSION_ORIGIN: `chrome-extension://${extensionId}`,
+  EXTENSION_REDIRECT_URL: `https://${extensionId}.chromiumapp.org/github`,
 });
 
 const { getOAuthConfig } = await import("../server/oauth/config.ts");

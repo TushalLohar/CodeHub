@@ -29,7 +29,7 @@ const sections = [
   {
     title: "Data SolveBase uses",
     body: [
-      "SolveBase stores your selected coding-platform usernames, enabled-platform settings, GitHub repository name, synchronization state, and GitHub authorization token in Chrome extension storage on your device.",
+      "SolveBase stores your GitHub username, selected coding-platform usernames, enabled-platform settings, GitHub repository name, synchronization state, and GitHub authorization token in Chrome extension storage on your device. These account names identify the connected accounts but are used only to perform the requested synchronization.",
       "When you submit a solution, SolveBase reads the accepted submission's source code and basic problem metadata from the supported coding platform so it can create or update the matching file in your GitHub repository.",
       "A pending submission witness may remain in Chrome extension storage for up to fifteen minutes while SolveBase waits for the verdict. If an accepted solution cannot reach GitHub immediately, its retry record, including any captured source code, may remain locally for up to twenty-four hours or until synchronization succeeds.",
     ],

@@ -64,11 +64,12 @@ let nextResponse = new Response(null, { status: 500 });
 let authorization = "";
 let requestedUrl = "";
 let requestedMethod = "";
+let responseQueue: Response[] = [];
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
   requestedUrl = String(input);
   requestedMethod = String(init?.method || "GET");
   authorization = String(new Headers(init?.headers).get("authorization") || "");
-  return nextResponse;
+  return responseQueue.shift() || nextResponse;
 }) as typeof fetch;
 
 const github = await import("../extension/github.js");
@@ -95,6 +96,22 @@ assert.equal(authorization, "Bearer valid-looking-token");
 nextResponse = new Response(null, { status: 403 });
 await assert.rejects(github.verifyToken("permission-token"), (error: unknown) =>
   hasGithubError(error, "github-permission", 403),
+);
+
+responseQueue = [
+  new Response(null, { status: 503 }),
+  new Response(null, { status: 503 }),
+  Response.json({ login: "TushalLohar" }, { headers: { "x-oauth-scopes": "public_repo" } }),
+];
+assert.deepEqual(await github.verifyToken("retry-token"), { login: "TushalLohar" });
+
+responseQueue = [
+  new Response(null, { status: 503 }),
+  new Response(null, { status: 503 }),
+  new Response(null, { status: 503 }),
+];
+await assert.rejects(github.verifyToken("busy-token"), (error: unknown) =>
+  hasGithubError(error, "transient", 503),
 );
 
 nextResponse = Response.json(

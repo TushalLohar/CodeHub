@@ -93,12 +93,34 @@
           <div class="section-heading">
             <div>
               <h1>Settings</h1>
-              <p>Choose where SolveBase saves your accepted solutions.</p>
+              <p>Configure repository and platform handles.</p>
             </div>
-            <button id="cancelEdit" type="button" class="text-button hidden">Cancel</button>
+            <button id="cancelEdit" type="button" class="text-button cancel-btn hidden">Cancel</button>
           </div>
 
-          <div class="form-section">
+          <p id="setupError" class="error-banner hidden" role="alert"></p>
+
+          <div class="setup-card github-setup-card">
+            <div class="github-card-top">
+              <span class="setup-icon-frame">
+                <img src="icons/github.svg" alt="" />
+              </span>
+              <div class="github-card-info">
+                <h2>GitHub repository</h2>
+                <span id="githubStatus" class="github-status not-connected">Not connected</span>
+              </div>
+              <button id="githubConnect" type="button" class="btn btn-connect">
+                Connect GitHub
+              </button>
+            </div>
+
+            <div class="form-group repo-group">
+              <label for="repo">Repository name</label>
+              <input id="repo" value="CP-Solutions" placeholder="CP-Solutions" autocomplete="off" spellcheck="false" />
+            </div>
+          </div>
+
+          <div class="setup-card">
             <h2>Platform accounts</h2>
             <div class="form-grid">
               <div class="form-group">
@@ -128,52 +150,64 @@
             </div>
           </div>
 
-          <div class="form-section">
-            <h2>GitHub repository</h2>
-            <div class="github-connect-row">
-              <span id="githubStatus" class="github-status not-connected">Not connected</span>
-              <button id="githubConnect" type="button" class="btn btn-outline">
-                Connect GitHub
-              </button>
-            </div>
-
-            <div class="form-group">
-              <label for="repo">Repository name</label>
-              <input id="repo" value="CP-Solutions" autocomplete="off" spellcheck="false" />
-            </div>
-          </div>
-
-          <fieldset class="form-section platform-fieldset">
+          <fieldset class="setup-card platform-fieldset">
             <legend>Active platforms</legend>
             <div class="platforms-grid">
               <label class="platform-toggle">
                 <input id="platformCF" type="checkbox" checked />
-                <span class="platform-control">Codeforces<span class="toggle-check">✓</span></span>
+                <span class="platform-control">
+                  <span class="platform-ctrl-left">
+                    <img src="icons/codeforces.svg" alt="" />
+                    <span>Codeforces</span>
+                  </span>
+                  <span class="toggle-check">✓</span>
+                </span>
               </label>
               <label class="platform-toggle">
                 <input id="platformLC" type="checkbox" checked />
-                <span class="platform-control">LeetCode<span class="toggle-check">✓</span></span>
+                <span class="platform-control">
+                  <span class="platform-ctrl-left">
+                    <img src="icons/leetcode.png" alt="" />
+                    <span>LeetCode</span>
+                  </span>
+                  <span class="toggle-check">✓</span>
+                </span>
               </label>
               <label class="platform-toggle">
                 <input id="platformCSES" type="checkbox" checked />
-                <span class="platform-control">CSES<span class="toggle-check">✓</span></span>
+                <span class="platform-control">
+                  <span class="platform-ctrl-left">
+                    <img src="icons/cses.svg" alt="" />
+                    <span>CSES</span>
+                  </span>
+                  <span class="toggle-check">✓</span>
+                </span>
               </label>
               <label class="platform-toggle">
                 <input id="platformCodeChef" type="checkbox" checked />
-                <span class="platform-control">CodeChef<span class="toggle-check">✓</span></span>
+                <span class="platform-control">
+                  <span class="platform-ctrl-left">
+                    <img src="icons/codechef.svg" alt="" />
+                    <span>CodeChef</span>
+                  </span>
+                  <span class="toggle-check">✓</span>
+                </span>
               </label>
               <label class="platform-toggle platform-toggle-wide">
                 <input id="platformGFG" type="checkbox" checked />
-                <span class="platform-control"
-                  >GeeksforGeeks<span class="toggle-check">✓</span></span
-                >
+                <span class="platform-control">
+                  <span class="platform-ctrl-left">
+                    <img src="icons/geeksforgeeks.svg" alt="" />
+                    <span>GeeksforGeeks</span>
+                  </span>
+                  <span class="toggle-check">✓</span>
+                </span>
               </label>
             </div>
           </fieldset>
 
-          <p id="setupError" class="error-banner hidden"></p>
           <div class="setup-actions">
-            <button id="save" class="btn btn-primary">Verify &amp; Save</button>
+            <button id="save" class="btn btn-primary btn-save">Verify &amp; Save</button>
             <button id="reset" class="text-button danger-text">Reset extension data</button>
           </div>
         </section>
@@ -191,13 +225,22 @@
               <span class="repo-icon-wrap">
                 <img src="icons/github.svg" alt="" />
               </span>
-              <span id="repoLine" class="repo-name"></span>
+              <div class="repo-meta">
+                <span class="repo-label">Target repository</span>
+                <span id="repoLine" class="repo-name"></span>
+              </div>
               <svg class="repo-open" aria-hidden="true"><use href="#icon-external"></use></svg>
             </a>
-            <button id="disconnectGithub" class="btn btn-disconnect">
-              <svg aria-hidden="true"><use href="#icon-logout"></use></svg>
-              <span>Disconnect</span>
-            </button>
+            <div class="repo-footer">
+              <span class="repo-status-indicator">
+                <span class="status-pip"></span>
+                <span>Active repository</span>
+              </span>
+              <button id="disconnectGithub" class="btn-disconnect-link" type="button">
+                <svg aria-hidden="true"><use href="#icon-logout"></use></svg>
+                <span>Disconnect</span>
+              </button>
+            </div>
           </div>
 
           <section class="platform-summary" aria-labelledby="activePlatformsTitle">

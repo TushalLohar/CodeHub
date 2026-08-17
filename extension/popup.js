@@ -263,7 +263,14 @@ function readSetupForm() {
   const handle = $("handle").value.trim();
   const codechefHandle = $("codechefHandle").value.trim();
   const gfgHandle = $("gfgHandle").value.trim();
-  const repo = $("repo").value.trim() || "CP-Solutions";
+  const repo = $("repo").value.trim();
+
+  if (!repo) {
+    return { error: "Enter a repository name." };
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(repo) || repo === "." || repo === ".." || repo.length > 100) {
+    return { error: "Invalid repository name. Use letters, numbers, hyphens, or dots." };
+  }
 
   if (
     !platforms.codeforces &&

@@ -2,6 +2,8 @@ import * as limiter from "./ratelimit.js";
 
 const API = "https://api.github.com";
 const REQUEST_TIMEOUT = 30000;
+const READ_RETRY_DELAYS = [400, 1000];
+const TRANSIENT_STATUSES = new Set([500, 502, 503, 504]);
 const README_MARKER = "<!-- cf-sync -->";
 const README_END_MARKER = "<!-- /cf-sync -->";
 
@@ -67,39 +69,50 @@ async function gh(token, path, options = {}) {
   const method = (options.method || "GET").toUpperCase();
   await limiter.reserve(MUTATING.has(method) ? "write" : "read");
 
-  let res;
-  try {
-    res = await fetch(`${API}${path}`, {
-      ...options,
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(options.body ? { "Content-Type": "application/json" } : {}),
-        ...(options.headers || {}),
-      },
-      signal: options.signal || AbortSignal.timeout(REQUEST_TIMEOUT),
-    });
-  } catch (e) {
-    if (e.name === "TimeoutError" || e.name === "AbortError") {
-      const err = new Error("GitHub request timed out — will retry");
+  const canRetry = method === "GET" || method === "HEAD";
+  for (let attempt = 0; ; attempt++) {
+    let res;
+    try {
+      res = await fetch(`${API}${path}`, {
+        ...options,
+        cache: "no-store",
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28",
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(options.headers || {}),
+        },
+        signal: options.signal || AbortSignal.timeout(REQUEST_TIMEOUT),
+      });
+    } catch (error) {
+      if (canRetry && attempt < READ_RETRY_DELAYS.length) {
+        await new Promise((resolve) => setTimeout(resolve, READ_RETRY_DELAYS[attempt]));
+        continue;
+      }
+      const err = new Error(
+        error?.name === "TimeoutError" || error?.name === "AbortError"
+          ? "GitHub request timed out. Try again in a moment."
+          : "GitHub could not be reached. Check your connection and try again.",
+      );
       err.code = "transient";
       throw err;
     }
-    throw e;
+
+    await limiter.note(res);
+    if (canRetry && TRANSIENT_STATUSES.has(res.status) && attempt < READ_RETRY_DELAYS.length) {
+      const retryAfter = parseRetryAfter(res.headers.get("retry-after"));
+      const delay = Math.min(5000, Math.max(retryAfter, READ_RETRY_DELAYS[attempt]));
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+    return res;
   }
-  await limiter.note(res);
-  return res;
 }
 
 export async function verifyToken(token) {
   const res = await gh(token, "/user");
-  if (!res.ok) {
-    const error = new Error(`GitHub token rejected (${res.status})`);
-    error.status = res.status;
-    error.code = res.status === 401 ? "github-auth" : "github-permission";
-    throw error;
-  }
+  if (!res.ok) throwHttpError(res, "verify authorization");
   const user = await res.json();
 
   const header = res.headers.get("x-oauth-scopes");
@@ -236,7 +249,7 @@ async function repositoryState(token, owner, repo, defaultBranch) {
     token,
     `${repositoryPath(owner, repo)}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`,
   );
-  if (!response.ok) throw new Error("GitHub could not inspect that repository safely.");
+  if (!response.ok) throwHttpError(response, "inspect repository");
   const payload = await response.json();
   if (payload?.truncated) {
     throw new Error("That repository is too large for SolveBase to index safely.");
@@ -266,17 +279,15 @@ export async function ensureRepo(token, owner, repo) {
     if (created.status === 422) {
       throw new Error("That name is already used by another repo. Pick a different name.");
     }
-    if (!created.ok) {
-      throw new Error("GitHub wouldn't accept that name. Try something different.");
-    }
+    if (!created.ok) throwHttpError(created, "create repository");
     return { created: true, synced: {} };
   }
-  if (!res.ok) throw new Error("GitHub wouldn't accept that name. Try something different.");
+  if (!res.ok) throwHttpError(res, "inspect repository");
   const repository = await res.json();
 
   const contents = await gh(token, contentsPath(owner, repo));
   if (contents.status === 404) return { created: false, adopted: true, synced: {} };
-  if (!contents.ok) throw new Error("GitHub could not inspect that repository safely.");
+  if (!contents.ok) throwHttpError(contents, "inspect repository");
   const entries = await contents.json();
   if (!Array.isArray(entries) || entries.length === 0) {
     return { created: false, adopted: true, synced: {} };
@@ -287,9 +298,7 @@ export async function ensureRepo(token, owner, repo) {
   );
   if (readme) {
     const readmeResponse = await gh(token, contentsPath(owner, repo, "README.md"));
-    if (!readmeResponse.ok) {
-      throw new Error("GitHub could not inspect that repository safely.");
-    }
+    if (!readmeResponse.ok) throwHttpError(readmeResponse, "inspect repository");
     const file = await readmeResponse.json();
     if (typeof file.content === "string" && fromB64(file.content).includes(README_MARKER)) {
       return { created: false, adopted: true, synced };
@@ -345,6 +354,12 @@ function throwHttpError(res, action) {
     );
     err.status = res.status;
     err.code = res.status === 401 ? "github-auth" : "github-permission";
+    throw err;
+  }
+  if (TRANSIENT_STATUSES.has(res.status)) {
+    const err = new Error(`GitHub is temporarily unavailable (${res.status}). Try again shortly.`);
+    err.status = res.status;
+    err.code = "transient";
     throw err;
   }
   throw new Error(`GitHub ${action} failed (${res.status})`);

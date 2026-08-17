@@ -40,7 +40,14 @@ const sections = [
       "Accepted solution source code is sent directly from the extension to GitHub through GitHub's API. SolveBase does not send source code to its own backend and does not use it for analytics, advertising, profiling, or model training.",
       "SolveBase reads only LeetCode's named CSRF cookie when LeetCode requires it as a request header. That value is never sent to GitHub or to the SolveBase OAuth service.",
       "The OAuth service at solvebase.dev performs the GitHub authorization exchange. OAuth state expires after five minutes, and the encrypted one-time token exchange expires after sixty seconds. The service also keeps short-lived rate-limit records to prevent abuse.",
+      "The website and OAuth service are hosted by Vercel, which may process standard request metadata such as an IP address. To prevent abuse, SolveBase hashes the request IP before storing a rate-limit counter in Upstash Redis for up to ten minutes. Upstash also stores only short-lived OAuth state and encrypted one-time exchange data needed to complete the connection flow.",
       "If the selected repository does not exist, SolveBase creates it as a public GitHub repository after the user explicitly confirms that choice. Accepted solution files committed there are publicly visible.",
+    ],
+  },
+  {
+    title: "Chrome Web Store Limited Use",
+    body: [
+      "SolveBase's use of user data complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. SolveBase uses data only to detect the user's accepted coding submissions and save them to the GitHub repository the user selects. It does not sell user data, use it for advertising or profiling, allow humans to read it, or transfer it for unrelated purposes.",
     ],
   },
   {

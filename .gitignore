@@ -134,4 +134,3 @@ temp/
 *.7z
 
 # Project-specific exception: deployed website download asset
-!public/cf-sync.zip

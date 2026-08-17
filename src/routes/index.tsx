@@ -64,7 +64,7 @@ export const Route = createFileRoute("/")({
                 "A browser extension that syncs accepted competitive-programming solutions to GitHub.",
               url: SITE_URL,
               downloadUrl: CHROME_WEB_STORE_URL,
-              softwareVersion: "1.0.1",
+              softwareVersion: "1.0.0",
               author: { "@type": "Person", name: "Tushal Lohar" },
               offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
             },
@@ -324,7 +324,7 @@ function Home() {
             <span className="font-mono text-xs font-semibold text-primary tracking-widest uppercase">
               Manifest V3 Extension
             </span>
-            <div className="font-mono text-sm font-bold text-foreground">SolveBase v1.0.1</div>
+            <div className="font-mono text-sm font-bold text-foreground">SolveBase v1.0.0</div>
           </div>
         </div>
         <div className="flex items-center gap-3">

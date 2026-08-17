@@ -1,5 +1,5 @@
 name: Report a bug
-description: Tell us what went wrong in CodeHub.
+description: Tell us what went wrong in SolveBase.
 title: "[Bug] "
 body:
   - type: textarea

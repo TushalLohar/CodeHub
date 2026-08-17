@@ -288,7 +288,8 @@ const FAQS = [
   },
   {
     question: "Which coding platforms does SolveBase support?",
-    answer: "SolveBase supports Codeforces, LeetCode, CSES, CodeChef, and GeeksforGeeks.",
+    answer:
+      "SolveBase supports Codeforces, standard LeetCode problem pages, CSES, CodeChef, and GeeksforGeeks. LeetCode contest and Explore editors are not supported in version 1.0.0.",
   },
   {
     question: "Does SolveBase upload source code to its own server?",
@@ -590,7 +591,8 @@ function Home() {
             <span>
               <strong className="text-foreground">Live submissions only:</strong> SolveBase syncs a
               solution only after it witnesses your submit action and confirms the accepted result.
-              It does not import old solves or queue contest submissions for later.
+              It does not scrape old platform submissions in bulk. LeetCode contest and Explore
+              editors are not supported in version 1.0.0.
             </span>
           </li>
           <li className="flex items-start gap-2">

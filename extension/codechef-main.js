@@ -7,6 +7,7 @@
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
   const MAX_RESPONSE_CHARS = 1024 * 1024;
   const seen = new Set();
+  const submitted = new Set();
   let lastTrustedSubmitAt = 0;
   let lastSubmitRequestAt = 0;
   let lastSubmissionId = null;
@@ -203,12 +204,39 @@
     );
   }
 
+  function emitSubmitted(id, payload = {}) {
+    if (!id || submitted.has(id)) return;
+    submitted.add(id);
+    const body =
+      payload.data && typeof payload.data === "object" ? { ...payload.data, ...payload } : payload;
+    const rawProblemCode =
+      body.problemCode ||
+      body.problem_code ||
+      body.result?.problemCode ||
+      body.other_details?.problemCode ||
+      null;
+    const problemCode = /^[A-Za-z0-9_]{1,64}$/.test(String(rawProblemCode || ""))
+      ? String(rawProblemCode)
+      : null;
+    window.postMessage(
+      {
+        type: "__SOLVEBASE_CC_SUBMITTED__",
+        submissionId: id,
+        problemCode,
+      },
+      location.origin,
+    );
+  }
+
   function handlePayload(payload, url) {
     if (!payload || typeof payload !== "object" || !recent(lastSubmitRequestAt)) return;
     const body =
       payload.data && typeof payload.data === "object" ? { ...payload.data, ...payload } : payload;
     const id = submissionId(body, url);
-    if (id) lastSubmissionId = id;
+    if (id) {
+      lastSubmissionId = id;
+      emitSubmitted(id, body);
+    }
     if (accepted(body)) emitAccepted(id || lastSubmissionId, body);
   }
 

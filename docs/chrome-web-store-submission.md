@@ -23,7 +23,7 @@ Detailed description:
 >
 > - Live synchronization after an accepted submission
 > - Codeforces organization by problem rating
-> - LeetCode organization by difficulty
+> - LeetCode organization by algorithm topic
 > - CSES, CodeChef, and GeeksforGeeks support
 > - Existing compatible repository recovery
 > - README totals rebuilt from repository files after reconnecting
@@ -33,6 +33,8 @@ Detailed description:
 > SolveBase sends solution source code directly from the extension to GitHub. It does not send source code to its own backend or use it for advertising, analytics, profiling, or model training.
 >
 > If the selected repository does not exist, SolveBase creates it as a public repository only after you explicitly confirm that its committed solution files will be publicly visible.
+>
+> Version 1.0.0 supports standard LeetCode problem pages. LeetCode contest and Explore editors are not supported.
 
 ## Single Purpose
 
@@ -42,7 +44,7 @@ Detailed description:
 
 ### `storage`
 
-Stores the user's selected repository, platform usernames, enabled-platform preferences, GitHub OAuth token, synchronization index, and connection-health state locally in trusted Chrome extension storage. Settings remain until reset or uninstall, deduplication entries expire after thirty days, and short-lived submission witnesses expire after fifteen minutes.
+Stores the user's selected repository, platform usernames, enabled-platform preferences, GitHub OAuth token, synchronization index, pending-submission retry state, and connection-health state locally in trusted Chrome extension storage. Settings remain until reset or uninstall, deduplication entries expire after thirty days, verdict witnesses expire after fifteen minutes, and accepted-solution retry records expire after twenty-four hours.
 
 ### `cookies`
 

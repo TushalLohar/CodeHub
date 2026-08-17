@@ -231,6 +231,21 @@ async function findLatestSubmission(taskId) {
   return null;
 }
 
+export async function inspectSubmission(resultId, expectedTaskId = "") {
+  if (!/^\d+$/.test(String(resultId || ""))) return { status: "waiting" };
+  const html = await getPageHtml(`/problemset/result/${resultId}/`);
+  if (!isSessionActive(html)) throw authError("Not signed in to CSES");
+  const taskId = taskIdFromResult(html);
+  if (expectedTaskId && taskId && String(expectedTaskId) !== taskId) {
+    return { status: "rejected" };
+  }
+  if (isAcceptedResult(html)) return { status: "accepted", taskId: taskId || expectedTaskId };
+  if (/WRONG ANSWER|TIME LIMIT EXCEEDED|RUNTIME ERROR|COMPILE ERROR|REJECTED/i.test(html)) {
+    return { status: "rejected" };
+  }
+  return { status: "waiting" };
+}
+
 function decodeEntities(str) {
   return str
     .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(Number(dec)))
@@ -356,9 +371,6 @@ function submissionUrl(taskId) {
 export const PLATFORM = {
   name: "cses",
   label: "CSES",
-  problemKey(sub) {
-    return sub.taskId || String(sub.id);
-  },
   async fetchMetadata(sub) {
     let problemInfo = null;
     try {

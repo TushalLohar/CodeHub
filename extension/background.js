@@ -5,6 +5,7 @@ import * as cses from "./cses.js";
 import * as codechef from "./codechef.js";
 import * as gfg from "./gfg.js";
 import * as sync from "./sync.js";
+import * as pending from "./pending.js";
 import * as gh from "./github.js";
 import * as oauth from "./oauth.js";
 import { enabledPlatforms, sessionKeyFor } from "./platforms.js";
@@ -13,14 +14,20 @@ const MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 const MAX_FIELD_LENGTH = 256;
 const WITNESS_TTL_MS = 15 * 60 * 1000;
 const GITHUB_AUTH_ALARM = "github-auth-health";
+const README_SYNC_ALARM = "readme-summary-sync";
+const PENDING_SYNC_ALARM = "pending-submission-sync";
 const GITHUB_AUTH_NOTICE_ID = "solvebase-github-auth-required";
 const GITHUB_AUTH_NOTICE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const PROJECT_REPO_OWNER = "TushalLohar";
 const PROJECT_REPO_NAME = "SolveBase";
 const TEXT_ENCODER = new TextEncoder();
 const SETUP_FLOW_TTL_MS = 10 * 60 * 1000;
+const READY_JOB_TTL_MS = 24 * 60 * 60 * 1000;
 
 let setupFlow = null;
+let readmeSyncTimer = null;
+let pendingSyncTimer = null;
+let pendingSyncRunning = null;
 
 function currentSetupFlow() {
   if (!setupFlow) return null;
@@ -43,6 +50,26 @@ function finishSetupFlow(status, error = "") {
   }
 }
 
+function scheduleRepositorySummary(delayMs = 500) {
+  if (readmeSyncTimer) clearTimeout(readmeSyncTimer);
+  readmeSyncTimer = setTimeout(() => {
+    readmeSyncTimer = null;
+    sync
+      .flushRepositorySummary()
+      .then((result) => {
+        if (result?.outcome === "deferred") {
+          scheduleRepositorySummary(30_000);
+        } else if (chrome.alarms?.clear) {
+          chrome.alarms.clear(README_SYNC_ALARM).catch(() => {});
+        }
+      })
+      .catch(() => scheduleRepositorySummary(5000));
+  }, delayMs);
+  if (chrome.alarms?.create) {
+    chrome.alarms.create(README_SYNC_ALARM, { delayInMinutes: 0.5 });
+  }
+}
+
 const PLATFORM_MESSAGE_HOSTS = {
   "cf-accepted": ["codeforces.com"],
   "lc-accepted": ["leetcode.com"],
@@ -50,8 +77,18 @@ const PLATFORM_MESSAGE_HOSTS = {
   "codechef-accepted": ["codechef.com"],
   "gfg-accepted": ["geeksforgeeks.org"],
   "cf-witness": ["codeforces.com"],
+  "lc-witness": ["leetcode.com"],
   "cses-witness": ["cses.fi"],
+  "codechef-witness": ["codechef.com"],
   "gfg-witness": ["geeksforgeeks.org"],
+};
+
+const WITNESS_PLATFORM = {
+  "cf-witness": "codeforces",
+  "lc-witness": "leetcode",
+  "cses-witness": "cses",
+  "codechef-witness": "codechef",
+  "gfg-witness": "gfg",
 };
 
 const POPUP_MESSAGES = new Set([
@@ -265,10 +302,34 @@ function sanitizeWitness(messageType, value) {
     };
   }
 
+  if (messageType === "lc-witness") {
+    const slug = textValue(value.slug, "LeetCode problem slug", 180);
+    const submissionId = textValue(value.submissionId, "LeetCode submission id", 32);
+    if (!/^[A-Za-z0-9-]+$/.test(slug) || (submissionId && !/^\d+$/.test(submissionId))) {
+      throw new Error("Invalid LeetCode submission witness.");
+    }
+    return { slug, submissionId: submissionId || null };
+  }
+
   if (messageType === "cses-witness") {
     const taskId = textValue(value.taskId, "CSES task id", 32);
-    if (!/^\d+$/.test(taskId)) throw new Error("Invalid CSES submission witness.");
-    return { taskId };
+    const resultId = textValue(value.resultId, "CSES result id", 32);
+    if (!/^\d+$/.test(taskId) || (resultId && !/^\d+$/.test(resultId))) {
+      throw new Error("Invalid CSES submission witness.");
+    }
+    return { taskId, resultId: resultId || null };
+  }
+
+  if (messageType === "codechef-witness") {
+    const submissionId = textValue(value.submissionId, "CodeChef submission id", 32);
+    const problemCode = textValue(value.problemCode, "CodeChef problem code", 80);
+    if (
+      (submissionId && !/^\d+$/.test(submissionId)) ||
+      (problemCode && !/^[A-Za-z0-9_]+$/.test(problemCode))
+    ) {
+      throw new Error("Invalid CodeChef submission witness.");
+    }
+    return { submissionId: submissionId || null, problemCode: problemCode || null };
   }
 
   const slug = textValue(value.slug, "GeeksforGeeks problem slug", 180);
@@ -284,10 +345,70 @@ function sanitizeWitness(messageType, value) {
   };
 }
 
+function watchJobId(platform, tabId) {
+  return `watch:${platform}:${tabId}`;
+}
+
+function readyJobId(platform, submissionId) {
+  return `ready:${platform}:${submissionId}`;
+}
+
+function schedulePendingProcessing(delayMs = 0) {
+  if (pendingSyncTimer) clearTimeout(pendingSyncTimer);
+  pendingSyncTimer = setTimeout(
+    () => {
+      pendingSyncTimer = null;
+      processPendingSubmissions().catch(() => schedulePendingProcessing(5000));
+    },
+    Math.max(0, delayMs),
+  );
+  if (chrome.alarms?.create) {
+    chrome.alarms.create(PENDING_SYNC_ALARM, { delayInMinutes: 0.5 });
+  }
+}
+
+async function queueWatch(platform, tabId, data, submittedAt = Date.now()) {
+  const id = watchJobId(platform, tabId);
+  const existing = (await pending.list()).find((job) => job.id === id);
+  await pending.upsert({
+    id,
+    platform,
+    phase: "watch",
+    tabId,
+    createdAt: existing?.createdAt || submittedAt,
+    submittedAt: existing?.submittedAt || submittedAt,
+    expiresAt: submittedAt + WITNESS_TTL_MS,
+    nextAt: Date.now() + 1200,
+    attempts: 0,
+    data: { ...(existing?.data || {}), ...data },
+  });
+  schedulePendingProcessing(1200);
+}
+
+async function queueReady(platform, submissionId, data, tabId, startProcessing = true) {
+  const now = Date.now();
+  if (Number.isInteger(tabId)) await pending.removeMatching(platform, tabId);
+  await pending.upsert({
+    id: readyJobId(platform, submissionId),
+    platform,
+    phase: "ready",
+    tabId: Number.isInteger(tabId) ? tabId : null,
+    createdAt: now,
+    submittedAt: Number(data.submittedAt || now),
+    expiresAt: now + READY_JOB_TTL_MS,
+    nextAt: now,
+    attempts: 0,
+    data,
+  });
+  if (startProcessing) schedulePendingProcessing(0);
+}
+
 async function handleWitnessMessage(msg, sender) {
   const key = witnessKey(msg.type, sender.tab.id);
+  const platform = WITNESS_PLATFORM[msg.type];
   if (msg.action === "clear") {
     await chrome.storage.session.remove(key);
+    await pending.removeMatching(platform, sender.tab.id);
     return { ok: true };
   }
   if (msg.action === "get") {
@@ -307,6 +428,7 @@ async function handleWitnessMessage(msg, sender) {
   }
   const at = Date.now();
   await chrome.storage.session.set({ [key]: { at, data } });
+  await queueWatch(platform, sender.tab.id, data, at);
   return { ok: true, witness: { ...data, time: at } };
 }
 
@@ -381,7 +503,7 @@ async function installLiveDetectors() {
   }
 }
 
-async function handleAccepted(platform, label, build) {
+async function handleAccepted(platform, label, build, options = {}) {
   const config = await store.getConfig();
   if (!config) {
     await store.setLastSync({ platform: label, status: "failed", error: "Finish setup first" });
@@ -394,6 +516,7 @@ async function handleAccepted(platform, label, build) {
   if (config.platforms?.[platform] === false) {
     return { ok: false, retry: false, error: `${label} is not enabled` };
   }
+  let persistedJobId = options.jobId || null;
   try {
     const submission = await build(config);
     if (!submission || !submission.id) {
@@ -404,9 +527,14 @@ async function handleAccepted(platform, label, build) {
       });
       return { ok: false, retry: true };
     }
+    if (options.persist !== false) {
+      persistedJobId = readyJobId(platform, submission.id);
+      await queueReady(platform, submission.id, { submission }, options.tabId, false);
+    }
     const result = await sync.processLive(platform, submission);
     const title = result?.meta?.title || submission.problemName || submission.title || "solution";
     if (result.outcome === "duplicate" || result.outcome === "unchanged") {
+      if (persistedJobId) await pending.remove(persistedJobId);
       await store.setLastSync({ platform: label, title, status: "already synced" });
       return { ok: true, result };
     }
@@ -436,7 +564,11 @@ async function handleAccepted(platform, label, build) {
       });
       return {
         ok: false,
-        retry: result.code === "transient" || result.code === "ratelimit",
+        retry:
+          result.code === "transient" ||
+          result.code === "ratelimit" ||
+          result.code === "unavailable" ||
+          result.code === "needs-tab",
         result: safeResult,
       };
     }
@@ -446,6 +578,8 @@ async function handleAccepted(platform, label, build) {
       status: "committed",
       path: result?.meta?.path || "",
     });
+    scheduleRepositorySummary();
+    if (persistedJobId) await pending.remove(persistedJobId);
     return { ok: true, result };
   } catch (err) {
     const message = errorText(err);
@@ -462,6 +596,217 @@ async function handleAccepted(platform, label, build) {
       return { ok: false, retry: false, error: message };
     }
     return { ok: false, retry: true, error: message };
+  } finally {
+    if (persistedJobId) schedulePendingProcessing(2000);
+  }
+}
+
+const PLATFORM_LABELS = {
+  codeforces: "Codeforces",
+  leetcode: "LeetCode",
+  cses: "CSES",
+  codechef: "CodeChef",
+  gfg: "GeeksforGeeks",
+};
+
+function retryDelay(attempts, requested = 0) {
+  const stepped = Math.min(30_000, 1500 * 2 ** Math.min(attempts, 5));
+  return Math.max(stepped, Math.min(Number(requested || 0), 5 * 60 * 1000));
+}
+
+async function resolveWatchJob(job, config) {
+  const data = job.data || {};
+  if (job.platform === "codeforces") {
+    if (!config.handle || !data.problemIndex) return { status: "waiting" };
+    const recent = await cf.getRecentSubmissions(config.handle, 30);
+    const submission = recent.find((candidate) => {
+      const createdAt = Number(candidate.creationTimeSeconds || 0) * 1000;
+      if (createdAt < Number(job.submittedAt || 0) - 5000) return false;
+      const candidateIndex = candidate.problem?.index || candidate.problemIndex || "";
+      if (String(candidateIndex).toUpperCase() !== String(data.problemIndex).toUpperCase()) {
+        return false;
+      }
+      const candidateContest = candidate.contestId || candidate.problem?.contestId || "";
+      return !data.contestId || !candidateContest || String(candidateContest) === data.contestId;
+    });
+    if (!submission || cf.isPendingSubmission(submission)) return { status: "waiting" };
+    if (submission.verdict !== "OK") return { status: "rejected" };
+    submission.source = data.source || null;
+    return { status: "accepted", submission };
+  }
+
+  if (job.platform === "leetcode") {
+    if (!data.slug) return { status: "waiting" };
+    const recent = await lc.fetchSubmissions(20);
+    const submission = recent.find((candidate) => {
+      if (data.submissionId) return String(candidate.id) === String(data.submissionId);
+      return (
+        candidate.slug === data.slug &&
+        Number(candidate.timestamp || 0) >= Number(job.submittedAt || 0) - 5000
+      );
+    });
+    return submission
+      ? { status: "accepted", submission: { id: String(submission.id), slug: submission.slug } }
+      : { status: "waiting" };
+  }
+
+  if (job.platform === "cses") {
+    if (!data.resultId || !data.taskId) return { status: "waiting" };
+    const result = await cses.inspectSubmission(data.resultId, data.taskId);
+    return result.status === "accepted"
+      ? {
+          status: "accepted",
+          submission: {
+            id: String(data.resultId),
+            resultId: String(data.resultId),
+            taskId: String(data.taskId),
+          },
+        }
+      : result;
+  }
+
+  if (job.platform === "codechef") {
+    if (!data.submissionId) return { status: "waiting" };
+    const result = await codechef.inspectSubmission(data.submissionId);
+    return result.status === "accepted"
+      ? {
+          status: "accepted",
+          submission: {
+            id: String(data.submissionId),
+            problemCode: result.problemCode || data.problemCode || undefined,
+          },
+        }
+      : result;
+  }
+
+  if (job.platform === "gfg") {
+    if (!config.gfgHandle || !data.slug || !data.source) return { status: "waiting" };
+    const solved = await gfg.findSolved(config.gfgHandle, data.slug, job.submittedAt);
+    if (!solved) return { status: "waiting" };
+    return {
+      status: "accepted",
+      submission: {
+        id: gfg.submissionIdFor(data.slug, data.source || ""),
+        slug: data.slug,
+        title: data.title || solved.title,
+        difficulty: data.difficulty || solved.difficulty,
+        language: data.language || solved.language,
+        url: data.url || undefined,
+        source: data.source || undefined,
+      },
+    };
+  }
+
+  return { status: "waiting" };
+}
+
+async function postponePendingJob(job, delayMs, attempts = Number(job.attempts || 0) + 1) {
+  await pending.update(job.id, {
+    attempts,
+    nextAt: Date.now() + Math.max(1000, delayMs),
+  });
+}
+
+async function processReadyJob(job) {
+  const submission = job.data?.submission;
+  if (!submission?.id) {
+    await pending.remove(job.id);
+    return;
+  }
+  const result = await handleAccepted(
+    job.platform,
+    PLATFORM_LABELS[job.platform] || job.platform,
+    async () => submission,
+    { persist: false, jobId: job.id },
+  );
+  if (result.ok) return;
+  if (result.reauth) {
+    await postponePendingJob(job, 60_000);
+    return;
+  }
+  if (result.retry === false) {
+    await pending.remove(job.id);
+    return;
+  }
+  await postponePendingJob(job, retryDelay(Number(job.attempts || 0), result.result?.retryAfter));
+}
+
+async function processPendingJob(job, config) {
+  if (config.platforms?.[job.platform] === false) {
+    await pending.remove(job.id);
+    return;
+  }
+  if (job.phase === "ready") {
+    await processReadyJob(job);
+    return;
+  }
+
+  const resolved = await resolveWatchJob(job, config);
+  if (resolved.status === "rejected") {
+    await pending.remove(job.id);
+    return;
+  }
+  if (resolved.status !== "accepted" || !resolved.submission?.id) {
+    await postponePendingJob(job, retryDelay(Number(job.attempts || 0)));
+    return;
+  }
+
+  const ready = {
+    ...job,
+    phase: "ready",
+    expiresAt: Date.now() + READY_JOB_TTL_MS,
+    nextAt: Date.now(),
+    attempts: 0,
+    data: { submission: resolved.submission },
+  };
+  await pending.upsert(ready);
+  await processReadyJob(ready);
+}
+
+async function processPendingSubmissions() {
+  if (pendingSyncRunning) return pendingSyncRunning;
+  pendingSyncRunning = (async () => {
+    const jobs = await pending.list();
+    if (jobs.length === 0) {
+      if (chrome.alarms?.clear) await chrome.alarms.clear(PENDING_SYNC_ALARM);
+      return;
+    }
+
+    const config = await store.getConfig();
+    const now = Date.now();
+    const due = jobs.filter((job) => Number(job.nextAt || 0) <= now).slice(0, 6);
+    for (const job of due) {
+      if (!config?.token || config.setupComplete === false) {
+        await postponePendingJob(job, 60_000, Number(job.attempts || 0));
+        continue;
+      }
+      try {
+        await processPendingJob(job, config);
+      } catch (error) {
+        if (error?.code === "auth") {
+          const session = (await store.get(store.KEYS.session, {})) || {};
+          const flag = sessionKeyFor(job.platform);
+          if (flag) session[flag] = false;
+          await store.setSession(session);
+          await pending.remove(job.id);
+        } else {
+          await postponePendingJob(job, retryDelay(Number(job.attempts || 0), error?.retryAfter));
+        }
+      }
+    }
+
+    const remaining = await pending.list();
+    if (remaining.length === 0) {
+      if (chrome.alarms?.clear) await chrome.alarms.clear(PENDING_SYNC_ALARM);
+      return;
+    }
+    const nextAt = Math.min(...remaining.map((job) => Number(job.nextAt || Date.now() + 30_000)));
+    schedulePendingProcessing(Math.min(25_000, Math.max(1000, nextAt - Date.now())));
+  })();
+  try {
+    await pendingSyncRunning;
+  } finally {
+    pendingSyncRunning = null;
   }
 }
 
@@ -470,6 +815,8 @@ chrome.runtime.onInstalled.addListener(() => {
     .migrate()
     .then(() => {
       scheduleGithubAuthHealthCheck();
+      scheduleRepositorySummary(1000);
+      schedulePendingProcessing(1000);
       return installLiveDetectors();
     })
     .catch(() => {});
@@ -477,6 +824,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onStartup.addListener(() => {
   scheduleGithubAuthHealthCheck();
+  scheduleRepositorySummary(1000);
+  schedulePendingProcessing(1000);
   store
     .migrate()
     .then(() => checkGithubAuthHealth())
@@ -486,6 +835,8 @@ chrome.runtime.onStartup.addListener(() => {
 if (chrome.alarms?.onAlarm) {
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === GITHUB_AUTH_ALARM) checkGithubAuthHealth().catch(() => {});
+    if (alarm.name === README_SYNC_ALARM) scheduleRepositorySummary(0);
+    if (alarm.name === PENDING_SYNC_ALARM) schedulePendingProcessing(0);
   });
 }
 
@@ -501,17 +852,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     await store.accessReady;
     if (!isAuthorizedMessage(msg, sender)) {
-      return sendResponse({ ok: false, error: "Forbidden" });
+      return sendResponse({ ok: false, retry: false, error: "Forbidden" });
     }
 
-    if (msg.type === "cf-witness" || msg.type === "cses-witness" || msg.type === "gfg-witness") {
+    if (
+      msg.type === "cf-witness" ||
+      msg.type === "lc-witness" ||
+      msg.type === "cses-witness" ||
+      msg.type === "codechef-witness" ||
+      msg.type === "gfg-witness"
+    ) {
       return sendResponse(await handleWitnessMessage(msg, sender));
     }
 
     if (msg.type === "cf-accepted") {
       const submissionId = textValue(msg.submissionId, "Codeforces submission id", 32);
       if (!/^\d+$/.test(submissionId)) {
-        return sendResponse({ ok: false, error: "Invalid Codeforces submission id." });
+        return sendResponse({
+          ok: false,
+          retry: false,
+          error: "Invalid Codeforces submission id.",
+        });
       }
       const contestId = textValue(msg.contestId, "Codeforces contest id", 24);
       const problemIndex = textValue(msg.problemIndex, "Codeforces problem index", 24);
@@ -519,40 +880,53 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const language = textValue(msg.language, "Codeforces language", 100);
       const source = sourceValue(msg.source);
       return sendResponse(
-        await handleAccepted("codeforces", "Codeforces", async (config) => {
-          let match = null;
-          let lookupError = null;
-          const handle = config.handle || "";
-          for (let attempt = 0; handle && attempt < 4 && !match; attempt++) {
-            let submissions = [];
-            try {
-              submissions = await cf.getAcceptedSubmissions(handle, 100);
-              lookupError = null;
-            } catch (error) {
-              lookupError = error;
-              if (error?.code !== "transient") throw error;
+        await handleAccepted(
+          "codeforces",
+          "Codeforces",
+          async (config) => {
+            let match = null;
+            let lookupError = null;
+            const handle = config.handle || "";
+            for (let attempt = 0; handle && attempt < 4 && !match; attempt++) {
+              let submissions = [];
+              try {
+                submissions = await cf.getAcceptedSubmissions(handle, 100);
+                lookupError = null;
+              } catch (error) {
+                lookupError = error;
+                if (error?.code !== "transient") throw error;
+              }
+              match = submissions.find((sub) => String(sub.id) === submissionId);
+              if (!match && attempt < 3) await new Promise((r) => setTimeout(r, 750));
             }
-            match = submissions.find((sub) => String(sub.id) === submissionId);
-            if (!match && attempt < 3) await new Promise((r) => setTimeout(r, 750));
-          }
-          if (!match && lookupError) throw lookupError;
-          if (!match) {
-            throw new Error("Codeforces has not confirmed this accepted submission yet.");
-          }
-          const submittedAt = Number(match.creationTimeSeconds || 0) * 1000;
-          if (submittedAt > 0 && Date.now() - submittedAt > 60 * 60 * 1000) {
-            throw new Error("Codeforces rejected a stale submission event.");
-          }
-          if (contestId && !match.contestId) match.contestId = contestId;
-          if (problemIndex || problemName) {
-            match.problem = match.problem || {};
-            if (problemIndex && !match.problem.index) match.problem.index = problemIndex;
-            if (problemName && !match.problem.name) match.problem.name = problemName;
-          }
-          if (language && !match.programmingLanguage) match.programmingLanguage = language;
-          match.source = source;
-          return match;
-        }),
+            if (!match && lookupError) throw lookupError;
+            if (!match) {
+              throw new Error("Codeforces has not confirmed this accepted submission yet.");
+            }
+            if (!cf.isFinalAcceptedSubmission(match)) {
+              const error = new Error(
+                "Codeforces has passed pretests but has not finished system testing yet.",
+              );
+              error.code = "transient";
+              error.retryAfter = 60_000;
+              throw error;
+            }
+            const submittedAt = Number(match.creationTimeSeconds || 0) * 1000;
+            if (submittedAt > 0 && Date.now() - submittedAt > 60 * 60 * 1000) {
+              throw new Error("Codeforces rejected a stale submission event.");
+            }
+            if (contestId && !match.contestId) match.contestId = contestId;
+            if (problemIndex || problemName) {
+              match.problem = match.problem || {};
+              if (problemIndex && !match.problem.index) match.problem.index = problemIndex;
+              if (problemName && !match.problem.name) match.problem.name = problemName;
+            }
+            if (language && !match.programmingLanguage) match.programmingLanguage = language;
+            match.source = source;
+            return match;
+          },
+          { tabId: sender.tab.id },
+        ),
       );
     }
 
@@ -568,43 +942,51 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         Date.now() - submittedAt > 15 * 60 * 1000 ||
         submittedAt - Date.now() > 30 * 1000
       ) {
-        return sendResponse({ ok: false, error: "Invalid LeetCode submission id." });
+        return sendResponse({ ok: false, retry: false, error: "Invalid LeetCode submission id." });
       }
       return sendResponse(
-        await handleAccepted("leetcode", "LeetCode", async () => {
-          let match = null;
-          let lookupError = null;
-          for (let attempt = 0; attempt < 4 && !match; attempt++) {
-            let recent = [];
-            try {
-              recent = await lc.fetchSubmissions(20);
-              lookupError = null;
-            } catch (error) {
-              lookupError = error;
-              if (error?.code !== "transient") throw error;
+        await handleAccepted(
+          "leetcode",
+          "LeetCode",
+          async () => {
+            if (incomingId) {
+              return { id: incomingId, slug: incomingSlug || undefined };
             }
-            match = incomingId
-              ? recent.find((submission) => String(submission.id) === incomingId) || null
-              : recent.find(
-                  (submission) =>
-                    submission.slug === incomingSlug &&
-                    submission.timestamp > 0 &&
-                    submission.timestamp >= submittedAt - 5000,
-                ) || null;
-            if (!match && attempt < 3) await new Promise((resolve) => setTimeout(resolve, 750));
-          }
-          if (!match && lookupError) throw lookupError;
-          if (!match || (incomingSlug && match.slug !== incomingSlug)) {
-            throw new Error("LeetCode has not confirmed this accepted submission yet.");
-          }
-          if (match.timestamp > 0 && match.timestamp < submittedAt - 5000) {
-            throw new Error("LeetCode rejected an older accepted submission.");
-          }
-          if (match.timestamp > 0 && Date.now() - match.timestamp > 60 * 60 * 1000) {
-            throw new Error("LeetCode rejected a stale submission event.");
-          }
-          return { id: String(match.id), slug: match.slug || incomingSlug || undefined };
-        }),
+            let match = null;
+            let lookupError = null;
+            for (let attempt = 0; attempt < 4 && !match; attempt++) {
+              let recent = [];
+              try {
+                recent = await lc.fetchSubmissions(20);
+                lookupError = null;
+              } catch (error) {
+                lookupError = error;
+                if (error?.code !== "transient") throw error;
+              }
+              match = incomingId
+                ? recent.find((submission) => String(submission.id) === incomingId) || null
+                : recent.find(
+                    (submission) =>
+                      submission.slug === incomingSlug &&
+                      submission.timestamp > 0 &&
+                      submission.timestamp >= submittedAt - 5000,
+                  ) || null;
+              if (!match && attempt < 3) await new Promise((resolve) => setTimeout(resolve, 750));
+            }
+            if (!match && lookupError) throw lookupError;
+            if (!match || (incomingSlug && match.slug !== incomingSlug)) {
+              throw new Error("LeetCode has not confirmed this accepted submission yet.");
+            }
+            if (match.timestamp > 0 && match.timestamp < submittedAt - 5000) {
+              throw new Error("LeetCode rejected an older accepted submission.");
+            }
+            if (match.timestamp > 0 && Date.now() - match.timestamp > 60 * 60 * 1000) {
+              throw new Error("LeetCode rejected a stale submission event.");
+            }
+            return { id: String(match.id), slug: match.slug || incomingSlug || undefined };
+          },
+          { tabId: sender.tab.id },
+        ),
       );
     }
 
@@ -616,16 +998,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         (resultId && !/^\d+$/.test(resultId)) ||
         (taskId && !/^\d+$/.test(taskId))
       ) {
-        return sendResponse({ ok: false, error: "Invalid CSES submission id." });
+        return sendResponse({ ok: false, retry: false, error: "Invalid CSES submission id." });
       }
       const name = textValue(msg.name, "CSES problem name");
       return sendResponse(
-        await handleAccepted("cses", "CSES", async () => ({
-          id: resultId || taskId,
-          resultId: resultId || undefined,
-          taskId: taskId || undefined,
-          name: name || undefined,
-        })),
+        await handleAccepted(
+          "cses",
+          "CSES",
+          async () => ({
+            id: resultId || taskId,
+            resultId: resultId || undefined,
+            taskId: taskId || undefined,
+            name: name || undefined,
+          }),
+          { tabId: sender.tab.id },
+        ),
       );
     }
 
@@ -639,21 +1026,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         Date.now() - submittedAt > 15 * 60 * 1000 ||
         submittedAt - Date.now() > 30 * 1000
       ) {
-        return sendResponse({ ok: false, error: "Invalid CodeChef submission id." });
+        return sendResponse({ ok: false, retry: false, error: "Invalid CodeChef submission id." });
       }
       const problemCode = textValue(msg.problemCode, "CodeChef problem code", 80);
       return sendResponse(
-        await handleAccepted("codechef", "CodeChef", async () => ({
-          id: submissionId,
-          problemCode: problemCode || undefined,
-        })),
+        await handleAccepted(
+          "codechef",
+          "CodeChef",
+          async () => ({
+            id: submissionId,
+            problemCode: problemCode || undefined,
+          }),
+          { tabId: sender.tab.id },
+        ),
       );
     }
 
     if (msg.type === "gfg-accepted") {
       const slug = textValue(msg.slug, "GeeksforGeeks problem slug", 180);
       if (!/^[A-Za-z0-9_-]+$/.test(slug)) {
-        return sendResponse({ ok: false, error: "Invalid GeeksforGeeks problem slug." });
+        return sendResponse({
+          ok: false,
+          retry: false,
+          error: "Invalid GeeksforGeeks problem slug.",
+        });
       }
       const title = textValue(msg.title, "GeeksforGeeks problem title");
       const difficulty = textValue(msg.difficulty, "GeeksforGeeks difficulty", 32);
@@ -672,44 +1068,53 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           }
           problemUrl = parsed.toString();
         } catch {
-          return sendResponse({ ok: false, error: "Invalid GeeksforGeeks problem URL." });
+          return sendResponse({
+            ok: false,
+            retry: false,
+            error: "Invalid GeeksforGeeks problem URL.",
+          });
         }
       }
       return sendResponse(
-        await handleAccepted("gfg", "GeeksforGeeks", async (config) => {
-          const currentSlug = (() => {
-            try {
-              return new URL(sender.url || "").pathname.match(
-                /\/(?:problems|problem)\/([A-Za-z0-9_-]+)/i,
-              )?.[1];
-            } catch {
-              return null;
+        await handleAccepted(
+          "gfg",
+          "GeeksforGeeks",
+          async (config) => {
+            const currentSlug = (() => {
+              try {
+                return new URL(sender.url || "").pathname.match(
+                  /\/(?:problems|problem)\/([A-Za-z0-9_-]+)/i,
+                )?.[1];
+              } catch {
+                return null;
+              }
+            })();
+            if (currentSlug && currentSlug.toLowerCase() !== slug.toLowerCase()) {
+              throw new Error("GeeksforGeeks moved to another problem before syncing completed.");
             }
-          })();
-          if (currentSlug && currentSlug.toLowerCase() !== slug.toLowerCase()) {
-            throw new Error("GeeksforGeeks moved to another problem before syncing completed.");
-          }
-          let source = capturedSource;
-          if (!source || !source.trim()) {
-            source = await gfg.fetchSource({
+            let source = capturedSource;
+            if (!source || !source.trim()) {
+              source = await gfg.fetchSource({
+                slug,
+                title,
+                difficulty,
+                language,
+                url: problemUrl,
+                handle: config.gfgHandle,
+              });
+            }
+            return {
+              id: gfg.submissionIdFor(slug, source),
               slug,
-              title,
-              difficulty,
-              language,
-              url: problemUrl,
-              handle: config.gfgHandle,
-            });
-          }
-          return {
-            id: gfg.submissionIdFor(slug, source),
-            slug,
-            title: title || undefined,
-            difficulty: difficulty || undefined,
-            language: language || undefined,
-            url: problemUrl || undefined,
-            source,
-          };
-        }),
+              title: title || undefined,
+              difficulty: difficulty || undefined,
+              language: language || undefined,
+              url: problemUrl || undefined,
+              source,
+            };
+          },
+          { tabId: sender.tab.id },
+        ),
       );
     }
 
@@ -923,6 +1328,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
     if (msg.type === "reset") {
       setupFlow = null;
+      if (readmeSyncTimer) clearTimeout(readmeSyncTimer);
+      readmeSyncTimer = null;
+      if (pendingSyncTimer) clearTimeout(pendingSyncTimer);
+      pendingSyncTimer = null;
+      if (chrome.alarms?.clear) await chrome.alarms.clear(README_SYNC_ALARM);
+      if (chrome.alarms?.clear) await chrome.alarms.clear(PENDING_SYNC_ALARM);
       await Promise.all([chrome.storage.local.clear(), chrome.storage.session.clear()]);
       await chrome.action.setBadgeText({ text: "" });
       if (chrome.notifications?.clear) {

@@ -31,7 +31,7 @@ const sections = [
     body: [
       "SolveBase stores your selected coding-platform usernames, enabled-platform settings, GitHub repository name, synchronization state, and GitHub authorization token in Chrome extension storage on your device.",
       "When you submit a solution, SolveBase reads the accepted submission's source code and basic problem metadata from the supported coding platform so it can create or update the matching file in your GitHub repository.",
-      "For GeeksforGeeks, the editor text captured at the submit click may remain in Chrome session storage for up to fifteen minutes so the accepted verdict stays tied to the code that was actually submitted.",
+      "A pending submission witness may remain in Chrome extension storage for up to fifteen minutes while SolveBase waits for the verdict. If an accepted solution cannot reach GitHub immediately, its retry record, including any captured source code, may remain locally for up to twenty-four hours or until synchronization succeeds.",
     ],
   },
   {
@@ -65,7 +65,7 @@ const sections = [
     title: "Control and deletion",
     body: [
       "Disconnecting GitHub removes the saved GitHub authorization token from the extension. Resetting SolveBase removes its local settings, cached synchronization state, and connection data. Files already committed to GitHub remain in your repository until you delete them there.",
-      "Settings and repository synchronization state remain on the device until the user resets or uninstalls SolveBase. Submission deduplication records expire after thirty days, and temporary session witnesses expire after fifteen minutes or when the browser session ends.",
+      "Settings and repository synchronization state remain on the device until the user resets or uninstalls SolveBase. Submission deduplication records expire after thirty days, pending verdict witnesses expire after fifteen minutes, and accepted-solution retry records expire after twenty-four hours.",
       "You can revoke SolveBase at any time from GitHub Settings under Applications.",
     ],
   },

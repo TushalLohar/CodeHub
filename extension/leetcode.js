@@ -252,10 +252,14 @@ async function submissionDetails(id, slug = null) {
     throw transientError("LeetCode did not return this submission yet — will retry");
   }
   if (!details.code || details.code.length < 2) {
-    throw new Error("LeetCode returned no source for this submission");
+    const err = new Error("LeetCode has not returned source for this submission yet");
+    err.code = "unavailable";
+    throw err;
   }
   if (Number(details.statusCode) !== 10) {
-    throw new Error(`LeetCode submission #${numericId} is not accepted`);
+    const err = new Error(`LeetCode has not confirmed submission #${numericId} as accepted yet`);
+    err.code = "unavailable";
+    throw err;
   }
   detailsCacheSet(key, details);
   return details;
@@ -314,9 +318,6 @@ export async function checkSession() {
 export const PLATFORM = {
   name: "leetcode",
   label: "LeetCode",
-  problemKey(sub) {
-    return sub.problemId ? String(sub.problemId) : sub.slug || String(sub.id);
-  },
   async fetchMetadata(sub) {
     const details = await submissionDetails(sub.id, sub.slug);
     const q = details.question || {};

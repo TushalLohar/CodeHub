@@ -140,6 +140,36 @@ export async function handleExists(handle) {
   }
 }
 
+export async function findSolved(handle, slug, submittedAt) {
+  if (!handle || !slug || !Number.isFinite(Number(submittedAt))) return null;
+  const payload = await api({ handle: handle.trim(), request_type: "solved", page: 1 });
+  const target = String(slug).toLowerCase();
+  const groups = payload?.result && typeof payload.result === "object" ? payload.result : {};
+  for (const [difficulty, entries] of Object.entries(groups)) {
+    if (!entries || typeof entries !== "object") continue;
+    for (const [id, item] of Object.entries(entries)) {
+      if (!item || typeof item !== "object") continue;
+      if (String(item.slug || "").toLowerCase() !== target) continue;
+      const rawTime = String(item.user_subtime || "").trim();
+      const timestamp = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rawTime)
+        ? Date.parse(`${rawTime.replace(" ", "T")}+05:30`)
+        : Date.parse(rawTime);
+      if (!Number.isFinite(timestamp) || timestamp < Number(submittedAt) - 2 * 60 * 1000) {
+        continue;
+      }
+      return {
+        id: String(id),
+        slug,
+        title: item.pname || undefined,
+        difficulty: difficulty || undefined,
+        language: item.lang || undefined,
+        submittedAt: timestamp,
+      };
+    }
+  }
+  return null;
+}
+
 // The practice API answers for any public handle, so a successful reply says
 // nothing about *our* session. What matters for syncing is whether the code is
 // reachable, which needs the site's own cookies or an open tab.
@@ -319,7 +349,6 @@ export async function fetchSource(sub) {
 export const PLATFORM = {
   name: "gfg",
   label: "GeeksforGeeks",
-  problemKey: keyFor,
   async fetchMetadata(sub) {
     const slug = sub.slug || sub.problemSlug || "problem";
     const title = keyFor(sub);

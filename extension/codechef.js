@@ -205,6 +205,15 @@ async function getSubmissionDetails(submissionId) {
   return null;
 }
 
+export async function inspectSubmission(submissionId) {
+  const details = await getSubmissionDetails(submissionId);
+  if (!details || !details.verdictKnown) return { status: "waiting" };
+  return {
+    status: details.accepted ? "accepted" : "rejected",
+    problemCode: details.problemCode || "",
+  };
+}
+
 // Fallback: borrow an open CodeChef tab to extract source.
 async function fetchSourceViaTab(submissionId) {
   if (!chrome.tabs?.query || !chrome.scripting?.executeScript) return null;
@@ -368,9 +377,6 @@ async function getProblemRating(problemCode, contestCode) {
 export const PLATFORM = {
   name: "codechef",
   label: "CodeChef",
-  problemKey(sub) {
-    return sub.problemCode || String(sub.id);
-  },
   async fetchMetadata(sub) {
     const details = await getSubmissionDetails(sub.id).catch(() => null);
     if (!details) {

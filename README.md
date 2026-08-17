@@ -38,6 +38,16 @@ folders while rejecting unrelated non-empty repositories. Existing README conten
 outside the marked SolveBase summary block. Supported layouts include the normal platform folders and
 older Codeforces repositories with rating folders at the repository root.
 
+## Supported submission pages
+
+SolveBase handles live submissions from Codeforces, standard LeetCode problem pages under
+`leetcode.com/problems/`, CSES, CodeChef problem pages, and GeeksforGeeks practice problems.
+LeetCode contest and Explore editors are not supported in version 1.0.0. Codeforces submissions that
+have passed only pretests are held until Codeforces reports a final accepted verdict.
+
+When adopting an older repository, SolveBase indexes recognized platform folders and conventional
+solution filenames. Unrecognized scratch files in legacy rating folders are intentionally ignored.
+
 ### Vercel Setup
 
 1. Create a Vercel project from this repository and connect `solvebase.dev` to Production.

@@ -10,6 +10,8 @@ export const KEYS = {
   problemset: "problemset",
   session: "session",
   processed: "processed",
+  pendingSubmissions: "pendingSubmissions",
+  readmeDirty: "readmeDirty",
   lastSync: "lastSync",
   githubAuthNoticeAt: "githubAuthNoticeAt",
   projectRepoStarred: "projectRepoStarred",
@@ -35,6 +37,11 @@ export async function get(key, fallback) {
 export async function set(key, value) {
   await accessReady;
   await chrome.storage.local.set({ [key]: value });
+}
+
+export async function remove(key) {
+  await accessReady;
+  await chrome.storage.local.remove(key);
 }
 
 export async function getConfig() {
@@ -89,7 +96,11 @@ export async function migrate() {
 }
 
 export async function clearWorkState() {
-  await set(KEYS.processed, {});
+  await Promise.all([
+    set(KEYS.processed, {}),
+    set(KEYS.pendingSubmissions, []),
+    remove(KEYS.readmeDirty),
+  ]);
 }
 
 export async function clearRepositoryState() {

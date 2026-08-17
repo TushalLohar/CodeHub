@@ -4,10 +4,12 @@ import fs from "node:fs";
 const read = (path: string) => fs.readFileSync(path, "utf8");
 const manifest = JSON.parse(read("extension/manifest.json")) as {
   version: string;
+  minimum_chrome_version: string;
   content_scripts: Array<{ matches: string[]; js: string[]; world?: string }>;
 };
 
 assert.equal(manifest.version, "1.0.0");
+assert.equal(manifest.minimum_chrome_version, "112");
 
 const mainWorldScripts = manifest.content_scripts.filter((script) => script.world === "MAIN");
 assert.ok(mainWorldScripts.length > 0);
@@ -30,6 +32,24 @@ assert.doesNotMatch(background, /ok:\s*false,\s*queued:\s*true/);
 assert.match(background, /repoVisibilityConfirmed/);
 assert.match(background, /setupFlow/);
 assert.match(background, /GitHub setup is already in progress/);
+assert.match(background, /result\.code === "unavailable"/);
+assert.match(background, /if \(incomingId\)/);
+
+const syncEngine = read("extension/sync.js");
+assert.match(syncEngine, /summaryChain/);
+assert.match(syncEngine, /crypto\.randomUUID\(\)/);
+
+const leetcodeContent = read("extension/content-leetcode.js");
+assert.match(leetcodeContent, /type: "lc-witness"/);
+assert.match(read("extension/leetcode-main.js"), /__SOLVEBASE_LC_SUBMITTED__/);
+
+const codechefContent = read("extension/content-codechef.js");
+assert.match(codechefContent, /type: "codechef-witness"/);
+assert.match(read("extension/codechef-main.js"), /__SOLVEBASE_CC_SUBMITTED__/);
+assert.match(read("extension/gfg.js"), /export async function findSolved/);
+assert.match(background, /gfg\.findSolved/);
+assert.match(background, /retry: false, error: "Invalid LeetCode submission id\."/);
+assert.match(read("extension/cf.js"), /isFinalAcceptedSubmission/);
 
 const popup = read("extension/popup.html");
 assert.match(popup, /id="repoPublicConsent"/);

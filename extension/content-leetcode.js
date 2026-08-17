@@ -39,10 +39,19 @@
     );
   }
 
+  function recordSubmit() {
+    lastTrustedSubmitAt = Date.now();
+    const slug = slugFromLocation();
+    if (!slug) return;
+    chrome.runtime
+      .sendMessage({ type: "lc-witness", action: "set", data: { slug } })
+      .catch(() => {});
+  }
+
   document.addEventListener(
     "click",
     (event) => {
-      if (event.isTrusted && isSubmitControl(event.target)) lastTrustedSubmitAt = Date.now();
+      if (event.isTrusted && isSubmitControl(event.target)) recordSubmit();
     },
     true,
   );
@@ -50,7 +59,7 @@
     "keydown",
     (event) => {
       if (event.isTrusted && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-        lastTrustedSubmitAt = Date.now();
+        recordSubmit();
       }
     },
     true,
@@ -97,15 +106,28 @@
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     const data = event.data;
-    if (!data || data.type !== "__SOLVEBASE_LC_ACCEPTED__") return;
+    if (!data || typeof data.type !== "string") return;
 
     const id = String(data.submissionId || "");
     if (id && !/^\d+$/.test(id)) return;
-    const submittedAt = consumeRecentSubmit();
-    if (!submittedAt) return;
-
     const rawSlug = String(data.slug || slugFromLocation() || "");
     const slug = /^[a-z0-9-]{1,180}$/i.test(rawSlug) ? rawSlug : null;
+    if (data.type === "__SOLVEBASE_LC_SUBMITTED__") {
+      if (!lastTrustedSubmitAt || Date.now() - lastTrustedSubmitAt > SUBMIT_TTL_MS) return;
+      if (!id || !slug) return;
+      chrome.runtime
+        .sendMessage({
+          type: "lc-witness",
+          action: "set",
+          data: { submissionId: id, slug },
+        })
+        .catch(() => {});
+      return;
+    }
+    if (data.type !== "__SOLVEBASE_LC_ACCEPTED__") return;
+
+    const submittedAt = consumeRecentSubmit();
+    if (!submittedAt) return;
     if (!id && !slug) return;
     report(id, slug, submittedAt);
   });

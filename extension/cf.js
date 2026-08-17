@@ -110,11 +110,26 @@ async function apiGet(path) {
   return json.result;
 }
 
+export async function getRecentSubmissions(handle, count = 200) {
+  return apiGet(`user.status?handle=${encodeURIComponent(handle)}&from=1&count=${count}`);
+}
+
 export async function getAcceptedSubmissions(handle, count = 200) {
-  const list = await apiGet(
-    `user.status?handle=${encodeURIComponent(handle)}&from=1&count=${count}`,
-  );
+  const list = await getRecentSubmissions(handle, count);
   return list.filter((s) => s.verdict === "OK");
+}
+
+export function isFinalAcceptedSubmission(submission) {
+  if (submission?.verdict !== "OK") return false;
+  const participantType = String(submission.author?.participantType || "").toUpperCase();
+  if (!["CONTESTANT", "OUT_OF_COMPETITION", "VIRTUAL"].includes(participantType)) return true;
+  return String(submission.testset || "").toUpperCase() !== "PRETESTS";
+}
+
+export function isPendingSubmission(submission) {
+  const verdict = String(submission?.verdict || "").toUpperCase();
+  if (!verdict || verdict === "TESTING") return true;
+  return verdict === "OK" && !isFinalAcceptedSubmission(submission);
 }
 
 // Only fail when Codeforces explicitly says the handle doesn't exist.
@@ -498,7 +513,6 @@ export async function checkSession() {
 export const PLATFORM = {
   name: "codeforces",
   label: "Codeforces",
-  problemKey,
   async fetchMetadata(sub) {
     const key = problemKey(sub);
     const contest = sub.contestId || (sub.problem && sub.problem.contestId) || "0";

@@ -8,7 +8,7 @@ Object.assign(globalThis, {
   },
 });
 
-const { buildReadme, ensureRepo, indexRepositoryFiles, mergeReadme } =
+const { buildReadme, ensureRepo, indexRepositoryFiles, mergeReadme, putFile } =
   await import("../extension/github.js");
 
 type SyncedIndex = Record<string, { folder?: string; path?: string }>;
@@ -91,5 +91,56 @@ assert.equal(adopted.adopted, true);
 assert.equal(Object.keys(adopted.synced).length, 1);
 assert.equal(adopted.synced["codeforces:4A"]?.folder, "900");
 assert.equal(requests.length, 4);
+
+const createRequests: Array<{ method: string; body: Record<string, unknown> }> = [];
+globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+  createRequests.push({
+    method: String(init?.method || "GET"),
+    body: init?.body ? JSON.parse(String(init.body)) : {},
+  });
+  return Response.json({ content: { sha: "created-sha" } });
+}) as typeof fetch;
+
+const created = await putFile(
+  "token",
+  "octocat",
+  "solutions",
+  "leetcode/array/1-Two-Sum.cpp",
+  "int main() {}",
+  "Add Two Sum",
+);
+assert.equal(created.outcome, "created");
+assert.deepEqual(
+  createRequests.map((request) => request.method),
+  ["PUT"],
+);
+assert.equal(createRequests[0]?.body["sha"], undefined);
+
+const conflictRequests: Array<{ method: string; body: Record<string, unknown> }> = [];
+globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+  const method = String(init?.method || "GET");
+  const body = init?.body ? JSON.parse(String(init.body)) : {};
+  conflictRequests.push({ method, body });
+  if (conflictRequests.length === 1) return new Response("", { status: 422 });
+  if (method === "GET") {
+    return Response.json({ sha: "existing-sha", content: btoa("old source") });
+  }
+  return Response.json({ content: { sha: "updated-sha" } });
+}) as typeof fetch;
+
+const updatedFile = await putFile(
+  "token",
+  "octocat",
+  "solutions",
+  "leetcode/array/1-Two-Sum.cpp",
+  "new source",
+  "Update Two Sum",
+);
+assert.equal(updatedFile.outcome, "updated");
+assert.deepEqual(
+  conflictRequests.map((request) => request.method),
+  ["PUT", "GET", "PUT"],
+);
+assert.equal(conflictRequests[2]?.body["sha"], "existing-sha");
 
 process.stdout.write("Repository state recovery test: ok\n");

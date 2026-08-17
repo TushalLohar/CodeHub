@@ -39,10 +39,21 @@
     );
   }
 
+  function recordSubmit() {
+    lastTrustedSubmitAt = Date.now();
+    chrome.runtime
+      .sendMessage({
+        type: "codechef-witness",
+        action: "set",
+        data: { problemCode: problemCodeFromPage() || undefined },
+      })
+      .catch(() => {});
+  }
+
   document.addEventListener(
     "click",
     (event) => {
-      if (event.isTrusted && isSubmitControl(event.target)) lastTrustedSubmitAt = Date.now();
+      if (event.isTrusted && isSubmitControl(event.target)) recordSubmit();
     },
     true,
   );
@@ -50,7 +61,7 @@
     "keydown",
     (event) => {
       if (event.isTrusted && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-        lastTrustedSubmitAt = Date.now();
+        recordSubmit();
       }
     },
     true,
@@ -58,7 +69,7 @@
   document.addEventListener(
     "submit",
     (event) => {
-      if (event.isTrusted) lastTrustedSubmitAt = Date.now();
+      if (event.isTrusted) recordSubmit();
     },
     true,
   );
@@ -111,15 +122,27 @@
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.origin !== location.origin) return;
     const data = event.data;
-    if (!data || data.type !== "__CF_SYNC_CC_ACCEPTED__") return;
+    if (!data || typeof data.type !== "string") return;
 
     const id = String(data.submissionId || "");
     if (!/^\d+$/.test(id)) return;
-    const submittedAt = consumeRecentSubmit();
-    if (!submittedAt) return;
-
     const rawProblemCode = String(data.problemCode || problemCodeFromPage() || "");
     const problemCode = /^[A-Za-z0-9_]{1,64}$/.test(rawProblemCode) ? rawProblemCode : null;
+    if (data.type === "__SOLVEBASE_CC_SUBMITTED__") {
+      if (!lastTrustedSubmitAt || Date.now() - lastTrustedSubmitAt > SUBMIT_TTL_MS) return;
+      chrome.runtime
+        .sendMessage({
+          type: "codechef-witness",
+          action: "set",
+          data: { submissionId: id, problemCode: problemCode || undefined },
+        })
+        .catch(() => {});
+      return;
+    }
+    if (data.type !== "__CF_SYNC_CC_ACCEPTED__") return;
+
+    const submittedAt = consumeRecentSubmit();
+    if (!submittedAt) return;
     report(id, problemCode, submittedAt);
   });
 })();

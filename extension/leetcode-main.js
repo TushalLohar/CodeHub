@@ -7,6 +7,7 @@
   const SUBMIT_TTL_MS = 10 * 60 * 1000;
   const MAX_RESPONSE_CHARS = 1024 * 1024;
   const emitted = new Set();
+  const submitted = new Set();
   const pending = new Map();
   let lastTrustedSubmitAt = 0;
   let lastSubmitRequestAt = 0;
@@ -161,6 +162,20 @@
     );
   }
 
+  function emitSubmitted(id) {
+    const numericId = /^\d+$/.test(String(id || "")) ? String(id) : null;
+    if (!numericId || submitted.has(numericId)) return;
+    submitted.add(numericId);
+    window.postMessage(
+      {
+        type: "__SOLVEBASE_LC_SUBMITTED__",
+        submissionId: numericId,
+        slug: slugFromLocation(),
+      },
+      location.origin,
+    );
+  }
+
   function inspect(url, method, text) {
     const relevant = isRelevantRequest(url, method);
     if (!text || text.length > MAX_RESPONSE_CHARS || !relevant) return;
@@ -179,6 +194,7 @@
     if (id && recent(lastTrustedSubmitAt) && String(method).toUpperCase() === "POST") {
       lastSubmitRequestAt = Date.now();
       pending.set(id, Date.now());
+      emitSubmitted(id);
     }
 
     if (!id || !isAccepted(data)) return;

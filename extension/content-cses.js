@@ -157,7 +157,19 @@
       if (!current) return;
 
       const resultId = resultIdFromUrl();
-      if (!resultId || !isAccepted()) return;
+      if (!resultId) return;
+
+      if (current.resultId !== resultId) {
+        const response = await chrome.runtime
+          .sendMessage({
+            type: "cses-witness",
+            action: "set",
+            data: { taskId: current.taskId, resultId },
+          })
+          .catch(() => null);
+        if (response?.witness) pending = response.witness;
+      }
+      if (!isAccepted()) return;
 
       const taskId = current.taskId || getTaskIdFromResultPage();
       report(resultId, taskId);

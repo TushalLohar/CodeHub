@@ -405,7 +405,20 @@ async function putFileWithExisting(token, owner, repo, path, content, message, e
   return { outcome: existing ? "updated" : "created" };
 }
 
-export async function putFile(token, owner, repo, path, content, message) {
+export async function putFile(token, owner, repo, path, content, message, options = {}) {
+  if (options.existingKnown !== true) {
+    const created = await gh(token, contentsPath(owner, repo, path), {
+      method: "PUT",
+      body: JSON.stringify({ message, content: b64(content) }),
+    });
+    if (created.ok) return { outcome: "created" };
+    if (created.status !== 422) throwHttpError(created, "write");
+
+    const existingAfterConflict = await getFile(token, owner, repo, path);
+    if (!existingAfterConflict) throwHttpError(created, "write");
+    return putFileWithExisting(token, owner, repo, path, content, message, existingAfterConflict);
+  }
+
   const existing = await getFile(token, owner, repo, path);
   return putFileWithExisting(token, owner, repo, path, content, message, existing);
 }

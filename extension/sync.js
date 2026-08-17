@@ -19,6 +19,7 @@ const TEXT_ENCODER = new TextEncoder();
 
 // Serialize GitHub writes so two solves landing at once cannot race on README.
 let writeChain = Promise.resolve();
+let summaryChain = Promise.resolve();
 
 function runExclusive(task) {
   const result = writeChain.then(task, task);
@@ -29,8 +30,23 @@ function runExclusive(task) {
   return result;
 }
 
+function runSummaryExclusive(task) {
+  const result = summaryChain.then(task, task);
+  summaryChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 function processedKey(platform, id) {
   return `${platform}:${id}`;
+}
+
+function comparableTitle(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 async function markProcessed(platform, id) {
@@ -52,11 +68,6 @@ async function wasProcessed(platform, id) {
 async function persistRepositorySummary(config) {
   const synced = await store.get(store.KEYS.synced, {});
   await gh.putReadme(config.token, config.owner, config.repo, synced, config.handle);
-}
-
-async function previousSolutionFor(syncedKey) {
-  const synced = await store.get(store.KEYS.synced, {});
-  return synced[syncedKey] || null;
 }
 
 async function writeOnce(config, platformName, submission) {
@@ -88,7 +99,20 @@ async function writeOnce(config, platformName, submission) {
   // Key by the PROBLEM, not the submission, so a re-submit overwrites instead
   // of inflating the README count.
   const syncedKey = `${platformName}:${meta.key || meta.title || meta.id}`;
-  const previous = await previousSolutionFor(syncedKey);
+  const synced = await store.get(store.KEYS.synced, {});
+  const importedCandidates =
+    platformName === "gfg"
+      ? Object.entries(synced).filter(
+          ([, item]) =>
+            item?.imported &&
+            item.platform === "gfg" &&
+            comparableTitle(item.title) === comparableTitle(meta.title),
+        )
+      : [];
+  const importedFallback =
+    importedCandidates.find(([, item]) => item.folder === meta.folder) || importedCandidates[0];
+  const previousKey = importedFallback?.[0] || syncedKey;
+  const previous = synced[previousKey] || null;
   // Imported solutions keep the user's existing folder and filename. Once a
   // matching problem is solved again, SolveBase updates that file in place.
   const preserveImportedPath = Boolean(previous?.imported && previous?.path);
@@ -98,6 +122,7 @@ async function writeOnce(config, platformName, submission) {
     previous && !preserveImportedPath && previous.path && previous.path !== targetPath
       ? previous
       : null;
+  const existingKnown = Object.values(synced).some((item) => item?.path === targetPath);
 
   const writeResult = await gh.putFile(
     config.token,
@@ -106,6 +131,7 @@ async function writeOnce(config, platformName, submission) {
     targetPath,
     code,
     `Add ${meta.title} (${meta.folder})`,
+    { existingKnown },
   );
 
   if (stale) {
@@ -118,7 +144,6 @@ async function writeOnce(config, platformName, submission) {
     );
   }
 
-  const synced = await store.get(store.KEYS.synced, {});
   for (const [key, item] of Object.entries(synced)) {
     if (key !== syncedKey && item?.path === targetPath) delete synced[key];
   }
@@ -132,13 +157,24 @@ async function writeOnce(config, platformName, submission) {
     ...(preserveImportedPath ? { imported: true } : {}),
   };
   await store.set(store.KEYS.synced, synced);
-
-  // Keep this inside runExclusive. A detached README write can race the next
-  // solution PUT and make GitHub reject one of them as a stale branch update.
-  await persistRepositorySummary(config);
   await markProcessed(platformName, submission.id);
+  await store.set(store.KEYS.readmeDirty, { at: Date.now(), id: crypto.randomUUID() });
 
   return { outcome: writeResult.outcome || "synced", meta };
+}
+
+export async function flushRepositorySummary() {
+  return runSummaryExclusive(async () => {
+    const dirty = await store.get(store.KEYS.readmeDirty, null);
+    if (!dirty) return { outcome: "clean" };
+    const config = await store.getConfig();
+    if (!config?.token || config.setupComplete === false) return { outcome: "deferred" };
+
+    await persistRepositorySummary(config);
+    const latest = await store.get(store.KEYS.readmeDirty, null);
+    if (latest?.id === dirty.id) await store.remove(store.KEYS.readmeDirty);
+    return { outcome: "synced" };
+  });
 }
 
 /**

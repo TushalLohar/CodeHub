@@ -18,6 +18,30 @@ const GITHUB_AUTH_NOTICE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const PROJECT_REPO_OWNER = "TushalLohar";
 const PROJECT_REPO_NAME = "SolveBase";
 const TEXT_ENCODER = new TextEncoder();
+const SETUP_FLOW_TTL_MS = 10 * 60 * 1000;
+
+let setupFlow = null;
+
+function currentSetupFlow() {
+  if (!setupFlow) return null;
+  if (Date.now() - setupFlow.startedAt > SETUP_FLOW_TTL_MS) {
+    setupFlow = null;
+    return null;
+  }
+  return { ...setupFlow };
+}
+
+function beginSetupFlow(status) {
+  setupFlow = { status, startedAt: Date.now(), error: "" };
+}
+
+function finishSetupFlow(status, error = "") {
+  setupFlow = { status, startedAt: Date.now(), error };
+  const openPopup = chrome.action?.openPopup;
+  if (typeof openPopup === "function") {
+    Promise.resolve(openPopup.call(chrome.action)).catch(() => {});
+  }
+}
 
 const PLATFORM_MESSAGE_HOSTS = {
   "cf-accepted": ["codeforces.com"],
@@ -701,6 +725,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         session,
         lastSync,
         projectRepoStarred: projectRepoStarred === true,
+        setupFlow: currentSetupFlow(),
       });
     }
 
@@ -761,6 +786,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!isRecord(msg.payload)) {
         return sendResponse({ ok: false, error: "Invalid settings." });
       }
+      const inProgress = currentSetupFlow();
+      if (inProgress && ["authorizing", "saving", "finalizing"].includes(inProgress.status)) {
+        return sendResponse({
+          ok: false,
+          pending: true,
+          error: "GitHub setup is already in progress. Finish the open authorization window.",
+        });
+      }
       const previous = await store.getConfig();
       const handle = textValue(msg.payload.handle, "Codeforces handle", 64);
       const codechefHandle = textValue(msg.payload.codechefHandle, "CodeChef username", 64);
@@ -800,17 +833,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (enabled.codechef && !codechefHandle) throw new Error("Enter your CodeChef username.");
         if (enabled.gfg && !gfgHandle) throw new Error("Enter your GeeksforGeeks username.");
 
+        beginSetupFlow(msg.payload.connect === true ? "authorizing" : "saving");
         let token = "";
         let owner = "";
         if (msg.payload.connect === true) {
           const result = await oauth.connect();
           token = result.token;
           owner = result.owner;
+          beginSetupFlow("finalizing");
         } else {
           token = previous?.token || "";
           owner = previous?.owner || "";
           if (!token) {
-            return sendResponse({ ok: false, error: "Connect GitHub first." });
+            throw new Error("Connect GitHub first.");
           }
           const user = await gh.verifyToken(token);
           owner = user.login;
@@ -870,10 +905,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (key) session[key] = true;
         }
         await store.setSession(session);
+        finishSetupFlow("complete");
         return sendResponse({ ok: true, owner });
       } catch (err) {
         if (isGithubUnauthorized(err)) await invalidateGithubAuth();
-        return sendResponse({ ok: false, error: errorText(err, "Could not save settings.") });
+        const message = errorText(err, "Could not save settings.");
+        finishSetupFlow("failed", message);
+        return sendResponse({ ok: false, error: message });
       }
     }
 
@@ -884,6 +922,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.type === "reset") {
+      setupFlow = null;
       await Promise.all([chrome.storage.local.clear(), chrome.storage.session.clear()]);
       await chrome.action.setBadgeText({ text: "" });
       if (chrome.notifications?.clear) {

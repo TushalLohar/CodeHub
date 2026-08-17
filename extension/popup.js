@@ -105,6 +105,50 @@ function renderGithubStatus(config) {
   }
 }
 
+function isSetupFlowActive(flow) {
+  return Boolean(flow && ["authorizing", "saving", "finalizing"].includes(flow.status));
+}
+
+function renderSetupFlow(flow) {
+  const active = isSetupFlowActive(flow);
+  const failed = flow?.status === "failed";
+  const banner = $("setupError");
+  const saveButton = $("save");
+  const connectButton = $("githubConnect");
+
+  if (active) {
+    const messages = {
+      authorizing:
+        "GitHub authorization is in progress. Complete the GitHub window, then return to SolveBase.",
+      saving: "Saving your SolveBase settings...",
+      finalizing: "GitHub connected. Preparing your repository...",
+    };
+    const buttonLabels = {
+      authorizing: "Authorizing GitHub...",
+      saving: "Saving settings...",
+      finalizing: "Preparing repository...",
+    };
+    banner.textContent = messages[flow.status];
+    banner.classList.remove("hidden");
+    banner.classList.add("progress-banner");
+    saveButton.disabled = true;
+    connectButton.disabled = true;
+    saveButton.textContent = buttonLabels[flow.status];
+    connectButton.textContent = flow.status === "authorizing" ? "Authorizing..." : "Please wait...";
+    return;
+  }
+
+  banner.classList.remove("progress-banner");
+  saveButton.disabled = false;
+  connectButton.disabled = false;
+  if (failed) {
+    banner.textContent = flow.error || "GitHub setup failed. Try again.";
+    banner.classList.remove("hidden");
+  } else if (flow?.status === "complete") {
+    banner.classList.add("hidden");
+  }
+}
+
 function renderStarState(starred, connected) {
   const button = $("starRepo");
   if (!button) return;
@@ -126,15 +170,18 @@ function renderStarState(starred, connected) {
 function render(state) {
   if (!state) return;
   const config = state.config;
+  const setupFlow = state.setupFlow;
   const configured = Boolean(
     config && config.hasToken && config.owner && config.setupComplete !== false,
   );
+  const setupFlowVisible = isSetupFlowActive(setupFlow) || setupFlow?.status === "failed";
   renderStarState(state.projectRepoStarred === true, configured);
-  $("setup").classList.toggle("hidden", configured && !editing);
-  $("status").classList.toggle("hidden", !configured || editing);
+  $("setup").classList.toggle("hidden", configured && !editing && !setupFlowVisible);
+  $("status").classList.toggle("hidden", !configured || editing || setupFlowVisible);
   $("cancelEdit").classList.toggle("hidden", !configured || !editing);
 
   renderGithubStatus(config);
+  renderSetupFlow(setupFlow);
 
   const session = state.session || {};
   const cfOk = session.cfOk;

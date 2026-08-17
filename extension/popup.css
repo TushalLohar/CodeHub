@@ -1041,6 +1041,12 @@ input:focus {
   font-weight: 700;
 }
 
+.error-banner.progress-banner {
+  border-color: #c9b8f4;
+  background: #f0ebff;
+  color: #514276;
+}
+
 .text-button:hover:not(:disabled) {
   color: var(--text);
 }

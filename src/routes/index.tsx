@@ -14,7 +14,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
-const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/";
+const CHROME_WEB_STORE_URL =
+  "https://chromewebstore.google.com/detail/solvebase-solves-to-githu/caeobmhokccipmdinfcajpagikggollm";
 const SITE_URL = "https://solvebase.dev";
 
 export const Route = createFileRoute("/")({
@@ -101,14 +102,46 @@ const RATINGS = [
   { label: "2400+", tone: "text-rated-orange", border: "border-rated-orange/30" },
 ];
 
+const HERO_CHIP_COLORS = [
+  "bg-white",
+  "bg-[#b9ead4]",
+  "bg-[#c7e6ff]",
+  "bg-[#dcd0ff]",
+  "bg-[#ffd6e7]",
+  "bg-[#ffe1b3]",
+];
+
+const PASTELS = ["pastel-sky", "pastel-mint", "pastel-butter", "pastel-pink", "pastel-lilac"];
+
+const HERO_MARQUEE =
+  "Pushed to GitHub · Auto-foldered by rating · README that updates itself · Zero copy-paste · ";
+
+const HERO_CARDS = [
+  {
+    title: "Detects",
+    body: "Watches for your accepted verdict on five judges — no button to press.",
+    bg: "bg-[#c7e6ff]",
+  },
+  {
+    title: "Organizes",
+    body: "Files each solve by platform, rating and topic in a clean directory tree.",
+    bg: "bg-[#b9ead4]",
+  },
+  {
+    title: "Summarizes",
+    body: "Rewrites your README with live counts every time a solution lands.",
+    bg: "bg-[#ffe1b3]",
+  },
+];
+
 const PLATFORM_PREVIEWS = [
   {
     id: "codeforces",
     name: "Codeforces",
     badge: "CF",
-    color: "text-blue-400",
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/30",
+    color: "text-blue-800",
+    bg: "bg-[#c7e6ff]",
+    border: "border-[#191919]",
     folder: "codeforces/1600/",
     file: "1899E - Queue Sort.cpp",
     sampleCode: `#include <bits/stdc++.h>
@@ -143,9 +176,9 @@ int main() {
     id: "leetcode",
     name: "LeetCode",
     badge: "LC",
-    color: "text-amber-400",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/30",
+    color: "text-amber-900",
+    bg: "bg-[#ffe1b3]",
+    border: "border-[#191919]",
     folder: "leetcode/binary-search/",
     file: "704 - Binary Search.cpp",
     sampleCode: `class Solution {
@@ -170,9 +203,9 @@ public:
     id: "cses",
     name: "CSES",
     badge: "CSES",
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/30",
+    color: "text-emerald-900",
+    bg: "bg-[#b9ead4]",
+    border: "border-[#191919]",
     folder: "cses/dynamic-programming/",
     file: "1633 - Dice Combinations.cpp",
     sampleCode: `#include <iostream>
@@ -199,9 +232,9 @@ int main() {
     id: "codechef",
     name: "CodeChef",
     badge: "CC",
-    color: "text-orange-400",
-    bg: "bg-orange-500/10",
-    border: "border-orange-500/30",
+    color: "text-orange-900",
+    bg: "bg-[#ffd6e7]",
+    border: "border-[#191919]",
     folder: "codechef/1600/",
     file: "MNERROR - Min Error.cpp",
     sampleCode: `#include <iostream>
@@ -223,9 +256,9 @@ int main() {
     id: "gfg",
     name: "GeeksforGeeks",
     badge: "GFG",
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
-    border: "border-emerald-500/30",
+    color: "text-violet-900",
+    bg: "bg-[#dcd0ff]",
+    border: "border-[#191919]",
     folder: "geeksforgeeks/Medium/",
     file: "Kadane's Algorithm.cpp",
     sampleCode: `class Solution {
@@ -310,333 +343,450 @@ const FAQS = [
 
 function Home() {
   const [activePlatform, setActivePlatform] = useState("codeforces");
-
   const selectedPlatform =
-    PLATFORM_PREVIEWS.find((p) => p.id === activePlatform) || PLATFORM_PREVIEWS[0]!;
+    PLATFORM_PREVIEWS.find((platform) => platform.id === activePlatform) || PLATFORM_PREVIEWS[0]!;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-border pb-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 font-mono text-lg font-black text-primary ring-1 ring-primary/30">
-            CF
+    <main className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+      <header className="site-nav flex items-center justify-between py-5">
+        <a href="#top" className="flex items-center gap-3" aria-label="SolveBase home">
+          <img
+            src="/solvebase-brand.png"
+            alt=""
+            className="h-10 w-10 rounded-xl border-2 border-[#191919] shadow-[3px_3px_0_#191919]"
+          />
+          <span className="font-mono text-sm font-black">
+            SOLVEBASE<span className="text-accent">.</span>
           </span>
-          <div>
-            <span className="font-mono text-xs font-semibold text-primary tracking-widest uppercase">
-              Manifest V3 Extension
-            </span>
-            <div className="font-mono text-sm font-bold text-foreground">SolveBase v1.0.0</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <a
-            href="https://github.com/TushalLohar/SolveBase"
-            target="_blank"
-            rel="noreferrer"
-            className="glass-card glass-card-hover inline-flex items-center gap-2 rounded-lg px-4 py-2 font-mono text-xs font-semibold text-foreground transition-all cursor-pointer"
-          >
-            <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>GitHub Sync</span>
+        </a>
+        <nav
+          className="hidden items-center gap-7 font-mono text-xs font-bold text-muted-foreground md:flex"
+          aria-label="Primary"
+        >
+          <a href="#how-it-works" className="nav-link">
+            How it works
           </a>
-          <a
-            href={CHROME_WEB_STORE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-mono text-xs font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90 cursor-pointer"
-          >
-            <Download className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Chrome Web Store</span>
+          <a href="#platforms" className="nav-link">
+            Platforms
           </a>
-        </div>
+          <a href="#faq-title" className="nav-link">
+            FAQ
+          </a>
+        </nav>
+        <a href={CHROME_WEB_STORE_URL} target="_blank" rel="noreferrer" className="cta-small">
+          <Download className="h-3.5 w-3.5" /> Install free
+        </a>
       </header>
 
-      <section className="py-14 sm:py-20">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 font-mono text-xs font-medium text-primary">
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Codeforces · LeetCode · CSES · CodeChef · GFG</span>
-        </div>
-
-        <h1 className="mt-6 max-w-3xl text-4xl leading-[1.15] font-extrabold sm:text-6xl tracking-tight">
-          Your competitive solves,
-          <br />
-          <span className="bg-gradient-to-r from-primary via-cyan-400 to-accent bg-clip-text text-transparent">
-            organized on GitHub
-          </span>{" "}
-          instantly.
-        </h1>
-
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-          Keep solving without friction. SolveBase detects your accepted submissions on{" "}
-          <strong className="text-foreground">Codeforces</strong>,{" "}
-          <strong className="text-foreground">LeetCode</strong>,{" "}
-          <strong className="text-foreground">CSES</strong>,{" "}
-          <strong className="text-foreground">CodeChef</strong>, and{" "}
-          <strong className="text-foreground">GeeksforGeeks</strong>, pulls your solution source,
-          and pushes it to clean directory trees with live repository statistics.
-        </p>
-
-        <div className="mt-9 flex flex-wrap items-center gap-4">
-          <a
-            href={CHROME_WEB_STORE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-7 py-3.5 font-mono text-sm font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:opacity-90 hover:scale-[1.02] cursor-pointer"
-          >
-            <Download className="h-4 w-4" aria-hidden="true" />
-            Install from Chrome Web Store
-          </a>
-          <span className="font-mono text-xs text-muted-foreground">
-            Chrome · Edge · Brave · Arc (Manifest V3)
-          </span>
-        </div>
-        <div className="mt-10 flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs text-muted-foreground mr-2">Codeforces Ratings:</span>
-          {RATINGS.map((r) => (
-            <span
-              key={r.label}
-              className={`rounded-md border ${r.border} bg-card/60 px-2.5 py-1 font-mono text-xs font-semibold ${r.tone}`}
+      <section
+        id="top"
+        className="new-hero hero-enter grid gap-10 py-12 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:py-20"
+      >
+        <div>
+          <div className="eyebrow">
+            <span className="pulse-dot" /> Live solution sync for competitive programmers
+          </div>
+          <h1 className="new-hero-title mt-6">
+            Solve it.
+            <br />
+            <span className="ink-highlight">Keep it.</span>
+          </h1>
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+            SolveBase quietly turns every accepted submission into a clean, searchable GitHub
+            archive. You focus on the verdict. Your portfolio keeps growing.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <a href={CHROME_WEB_STORE_URL} target="_blank" rel="noreferrer" className="cta-primary">
+              <Download className="h-4 w-4" /> Add to Chrome
+            </a>
+            <a
+              href="https://github.com/TushalLohar/SolveBase"
+              target="_blank"
+              rel="noreferrer"
+              className="cta-secondary"
             >
-              {r.label}
+              <GitBranch className="h-4 w-4" /> Star on GitHub <span aria-hidden="true">☆</span>
+            </a>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 font-mono text-xs text-muted-foreground">
+            <span>Free forever</span>
+            <span>No personal tokens</span>
+            <span>Manifest V3</span>
+          </div>
+        </div>
+
+        <div className="product-stage">
+          <div className="stage-orbit orbit-one" />
+          <div className="stage-orbit orbit-two" />
+          <div className="mock-window">
+            <div className="mock-top">
+              <span className="window-dots">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                solvebase / live-sync
+              </span>
+              <span className="status-pill">
+                <span className="pulse-dot" /> synced
+              </span>
+            </div>
+            <div className="mock-body">
+              <div className="mock-sidebar">
+                <div className="mock-brand">SB</div>
+                <span className="mock-side-active">Overview</span>
+                <span>Platforms</span>
+                <span>Activity</span>
+                <span>Settings</span>
+              </div>
+              <div className="mock-main">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Today
+                    </p>
+                    <h2 className="mt-1 text-xl font-black">Your archive is moving.</h2>
+                  </div>
+                  <span className="rounded-full bg-[#b9ead4] px-2 py-1 font-mono text-[10px] font-bold">
+                    +12 solves
+                  </span>
+                </div>
+                <div className="mock-chart mt-6">
+                  <span style={{ height: "38%" }} />
+                  <span style={{ height: "52%" }} />
+                  <span style={{ height: "44%" }} />
+                  <span style={{ height: "72%" }} />
+                  <span style={{ height: "61%" }} />
+                  <span style={{ height: "88%" }} />
+                  <span style={{ height: "78%" }} />
+                </div>
+                <div className="mt-5 space-y-2">
+                  <div className="activity-row">
+                    <span className="activity-icon bg-[#c7e6ff]">CF</span>
+                    <span>
+                      <b>Queue Sort</b>
+                      <small>codeforces/1600</small>
+                    </span>
+                    <em>committed</em>
+                  </div>
+                  <div className="activity-row">
+                    <span className="activity-icon bg-[#ffe1b3]">LC</span>
+                    <span>
+                      <b>Binary Search</b>
+                      <small>leetcode/binary-search</small>
+                    </span>
+                    <em>committed</em>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="floating-note note-left">
+            <Radar className="h-4 w-4 text-accent" />
+            <span>
+              <b>Accepted detected</b>
+              <small>just now</small>
             </span>
-          ))}
+          </div>
+          <div className="floating-note note-right">
+            <ShieldCheck className="h-4 w-4 text-[#1f8a4c]" />
+            <span>
+              <b>Direct to GitHub</b>
+              <small>no middleman</small>
+            </span>
+          </div>
+          <div className="repo-card">
+            <div className="repo-card-top">
+              <span className="repo-github-mark">
+                <GitBranch className="h-3.5 w-3.5" />
+              </span>
+              <span className="font-mono text-[9px] text-muted-foreground">
+                github.com / TushalLohar / CP-Solutions
+              </span>
+              <span className="repo-public">Public</span>
+            </div>
+            <div className="repo-card-title">
+              <h3>CP-Solutions</h3>
+              <span className="repo-star">☆ 24</span>
+            </div>
+            <p className="repo-description">
+              Competitive programming solutions, organized automatically by SolveBase.
+            </p>
+            <div className="repo-tabs">
+              <span className="repo-tab-active">Code</span>
+              <span>Issues 0</span>
+              <span>Pull requests 0</span>
+            </div>
+            <div className="repo-file">
+              <FolderTree className="h-3.5 w-3.5 text-[#2563c9]" />
+              <b>codeforces</b>
+              <span>1899E - Queue Sort.cpp</span>
+              <em>2 min ago</em>
+            </div>
+            <div className="repo-file repo-subfile">
+              <span className="repo-tree">↳</span>
+              <span>1600/</span>
+              <span>1899E - Queue Sort.cpp</span>
+              <em>2 min ago</em>
+            </div>
+            <div className="repo-file">
+              <FolderTree className="h-3.5 w-3.5 text-[#1f8a4c]" />
+              <b>leetcode</b>
+              <span>704 - Binary Search.cpp</span>
+              <em>yesterday</em>
+            </div>
+            <div className="repo-file repo-subfile">
+              <span className="repo-tree">↳</span>
+              <span>binary-search/</span>
+              <span>704 - Binary Search.cpp</span>
+              <em>yesterday</em>
+            </div>
+            <div className="repo-file">
+              <FolderTree className="h-3.5 w-3.5 text-[#7a3fc4]" />
+              <b>geeksforgeeks</b>
+              <span>Kadane's Algorithm.cpp</span>
+              <em>3 days ago</em>
+            </div>
+            <div className="repo-file repo-subfile">
+              <span className="repo-tree">↳</span>
+              <span>Medium/</span>
+              <span>Kadane's Algorithm.cpp</span>
+              <em>3 days ago</em>
+            </div>
+            <div className="repo-readme">
+              <div className="repo-readme-head">
+                <span>README.md</span>
+                <span className="repo-live">
+                  <span className="pulse-dot" /> live
+                </span>
+              </div>
+              <div className="repo-stat-grid">
+                <span>
+                  <b>126</b>
+                  <small>Total solved</small>
+                </span>
+                <span>
+                  <b>42</b>
+                  <small>Codeforces</small>
+                </span>
+                <span>
+                  <b>52</b>
+                  <small>LeetCode</small>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="py-12">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Live Organization Preview</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Select a judge to preview directory structure, code styling, and README summary.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PLATFORM_PREVIEWS.map((p) => (
+      <section className="trust-strip">
+        <span>Built for the daily grind</span>
+        <div className="platform-wordmark">
+          <b>Codeforces</b>
+          <b>LeetCode</b>
+          <b>CSES</b>
+          <b>CodeChef</b>
+          <b>GeeksforGeeks</b>
+        </div>
+      </section>
+
+      <section id="platforms" className="site-reveal py-20">
+        <div className="section-kicker">One workflow, five judges</div>
+        <div className="mt-3 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <h2 className="new-section-title">
+            Your code, in the
+            <br />
+            right place every time.
+          </h2>
+          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Choose a platform to see exactly how SolveBase names folders, formats files, and updates
+            your README.
+          </p>
+        </div>
+        <div className="mt-10 platform-lab">
+          <div className="platform-list">
+            {PLATFORM_PREVIEWS.map((platform) => (
               <button
-                key={p.id}
-                onClick={() => setActivePlatform(p.id)}
-                className={`flex items-center gap-2 rounded-lg px-3.5 py-2 font-mono text-xs font-semibold transition-all cursor-pointer ${
-                  activePlatform === p.id
-                    ? `${p.bg} ${p.color} border ${p.border} shadow-sm`
-                    : "bg-card/40 text-muted-foreground border border-border hover:text-foreground"
-                }`}
+                key={platform.id}
+                onClick={() => setActivePlatform(platform.id)}
+                className={`platform-row ${activePlatform === platform.id ? "is-active" : ""}`}
               >
-                <span className="font-bold">{p.badge}</span>
-                <span>{p.name}</span>
+                <span className={`platform-badge ${platform.bg}`}>{platform.badge}</span>
+                <span>{platform.name}</span>
+                <span className="ml-auto">
+                  {activePlatform === platform.id ? "Viewing" : "View"}
+                </span>
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="glass-card rounded-2xl border border-border overflow-hidden shadow-2xl">
-          <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-destructive/60 inline-block"></span>
-              <span className="h-3 w-3 rounded-full bg-rated-orange/60 inline-block"></span>
-              <span className="h-3 w-3 rounded-full bg-rated-green/60 inline-block"></span>
-              <span className="ml-2 font-mono text-xs text-muted-foreground flex items-center gap-1.5">
-                <Code2 className="h-3.5 w-3.5" />
+          <div className="lab-preview">
+            <div className="lab-header">
+              <span className="font-mono text-xs text-muted-foreground">
                 {selectedPlatform.folder}
-                <strong className="text-foreground">{selectedPlatform.file}</strong>
+                {selectedPlatform.file}
+              </span>
+              <span className="status-pill">
+                <span className="pulse-dot" /> ready
               </span>
             </div>
-            <span
-              className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${selectedPlatform.bg} ${selectedPlatform.color}`}
+            <div
+              key={selectedPlatform.id}
+              className="preview-swap grid gap-6 p-5 lg:grid-cols-[1.25fr_0.75fr]"
             >
-              {selectedPlatform.name}
-            </span>
-          </div>
-
-          <div className="grid lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-border">
-            <div className="lg:col-span-3 p-5 overflow-x-auto bg-black/40">
-              <pre className="font-mono text-xs leading-relaxed text-zinc-300">
+              <pre className="code-surface">
                 <code>{selectedPlatform.sampleCode}</code>
               </pre>
-            </div>
-
-            <div className="lg:col-span-2 p-5 bg-card/20 flex flex-col justify-between">
               <div>
-                <div className="flex items-center gap-2 text-xs font-mono font-bold text-muted-foreground uppercase tracking-wider mb-3">
-                  <FolderTree className="h-3.5 w-3.5 text-primary" />
-                  <span>README.md Preview</span>
+                <p className="section-kicker">README.md</p>
+                <pre className="readme-surface mt-3">{selectedPlatform.readmePreview}</pre>
+                <div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
+                  <RefreshCcw className="h-3.5 w-3.5 text-accent" /> Updated after every accepted
+                  solve
                 </div>
-                <pre className="font-mono text-xs leading-relaxed text-zinc-400 bg-background/50 p-3 rounded-lg border border-border overflow-x-auto">
-                  {selectedPlatform.readmePreview}
-                </pre>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-border/50 flex items-center justify-between text-xs font-mono text-muted-foreground">
-                <span>Auto-committed to:</span>
-                <span className="text-foreground font-bold">CP-Solutions/</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="py-12 glass-card rounded-2xl p-6 sm:p-8">
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <FolderTree className="h-5 w-5 text-primary" />
-          <span>Universal Repository Layout</span>
+      <section id="how-it-works" className="site-reveal workflow-section">
+        <div className="section-kicker">Set it once</div>
+        <h2 className="new-section-title mt-3">
+          From verdict to
+          <br />
+          <span className="ink-highlight mint">portfolio proof.</span>
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Every platform is organized into its dedicated top-level directory with consistent naming
-          conventions.
-        </p>
-
-        <pre className="mt-5 overflow-x-auto font-mono text-xs leading-relaxed text-muted-foreground sm:text-sm bg-background/60 p-4 rounded-xl border border-border">
-          {`CP-Solutions/
-├── codeforces/
-│   ├── 800/
-│   │   └── 4A - Watermelon.cpp
-│   ├── 1200/
-│   │   └── 231A - Team.py
-│   └── Unrated/
-│       └── 1A - Theatre Square.cpp
-├── leetcode/
-│   ├── binary-search/
-│   │   └── 704 - Binary Search.cpp
-│   └── dynamic-programming/
-│       └── 70 - Climbing Stairs.cpp
-├── cses/
-│   ├── dynamic-programming/
-│   │   └── 1633 - Dice Combinations.cpp
-│   └── graph-algorithms/
-│       └── 1192 - Counting Rooms.cpp
-├── codechef/
-│   ├── 900/
-│   │   └── RESELL - Reselling Items.cpp
-│   ├── 1600/
-│   │   └── MNERROR - Min Error.cpp
-│   └── 1800/
-│       └── GOOD1 - Good Permutation.cpp
-├── geeksforgeeks/
-│   ├── Easy/
-│   │   └── Missing in Array.cpp
-│   └── Medium/
-│       └── Kadane's Algorithm.cpp
-└── README.md      ← Live total solved & per-platform statistical tables`}
-        </pre>
+        <div className="workflow-grid mt-12">
+          <div className="workflow-line" />
+          {[
+            {
+              n: "01",
+              icon: GitBranch,
+              title: "Connect GitHub",
+              body: "Authorize once and pick the repository where your solutions belong.",
+            },
+            {
+              n: "02",
+              icon: Radar,
+              title: "Keep solving",
+              body: "SolveBase watches only for an accepted submission on the page you are using.",
+            },
+            {
+              n: "03",
+              icon: FolderTree,
+              title: "Build your archive",
+              body: "The source, folder and README stats arrive in GitHub automatically.",
+            },
+          ].map((step) => (
+            <div key={step.n} className="workflow-step">
+              <span className="step-number">{step.n}</span>
+              <div className="step-icon">
+                <step.icon className="h-5 w-5" />
+              </div>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
-      <section className="py-16">
-        <h2 className="text-2xl font-bold">Engineered for Competitive Programmers</h2>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <article
-              key={f.title}
-              className="glass-card glass-card-hover rounded-xl p-5 flex flex-col justify-between"
-            >
+      <section className="site-reveal feature-band">
+        <div>
+          <div className="section-kicker">Designed for focus</div>
+          <h2 className="new-section-title mt-3">
+            The invisible
+            <br />
+            teammate.
+          </h2>
+        </div>
+        <div className="feature-list">
+          {FEATURES.slice(0, 4).map((feature, index) => (
+            <article key={feature.title} className="feature-line">
+              <span className="feature-index">0{index + 1}</span>
+              <feature.icon className="h-5 w-5 text-accent" />
               <div>
-                <f.icon className="h-5 w-5 text-primary" aria-hidden="true" />
-                <h3 className="mt-4 text-base font-bold text-foreground">{f.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
+                <h3>{feature.title}</h3>
+                <p>{feature.body}</p>
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="py-12 border-t border-border">
-        <div className="glass-card rounded-2xl p-6 sm:p-10">
-          <h2 className="text-2xl font-bold">Get Started in 60 Seconds</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            No tokens to generate, no copy-paste. One-click GitHub authorization.
+      <section className="install-panel site-reveal">
+        <div>
+          <div className="section-kicker">Ready when you are</div>
+          <h2 className="new-section-title mt-3">
+            Make your next
+            <br />
+            solve count twice.
+          </h2>
+        </div>
+        <div>
+          <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+            Install SolveBase once. Keep your attention on the problem and let your GitHub profile
+            tell the story.
           </p>
-
-          <ol className="mt-8 space-y-6 text-sm text-muted-foreground">
-            <li className="flex gap-3">
-              <span className="font-mono text-accent font-bold">01</span>
-              <div>
-                <span>
-                  Install the extension and open it. Click{" "}
-                  <strong className="text-foreground">Connect GitHub</strong>.
-                </span>
-                <p className="mt-1.5 text-xs text-muted-foreground/80">
-                  GitHub asks you to authorize SolveBase to manage a solutions repository. Approve
-                  it — no personal access token needed.
-                </p>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-mono text-accent font-bold">02</span>
-              <div>
-                <span>
-                  Enter your handles (Codeforces, CodeChef, GeeksforGeeks) and pick the platforms
-                  you compete on.
-                </span>
-              </div>
-            </li>
-            <li className="flex gap-3">
-              <span className="font-mono text-accent font-bold">03</span>
-              <div>
-                <span>
-                  Hit <strong className="text-foreground">Save</strong>. From now on, every accepted
-                  solution is committed to GitHub within seconds.
-                </span>
-              </div>
-            </li>
-          </ol>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <a href={CHROME_WEB_STORE_URL} target="_blank" rel="noreferrer" className="cta-primary">
+              Install SolveBase <Download className="h-4 w-4" />
+            </a>
+            <a
+              href="https://github.com/TushalLohar/SolveBase"
+              target="_blank"
+              rel="noreferrer"
+              className="cta-secondary"
+            >
+              Star on GitHub <span aria-hidden="true">☆</span>
+            </a>
+          </div>
         </div>
       </section>
 
-      <section className="mt-12 glass-card rounded-2xl p-6 sm:p-8">
-        <div className="flex items-center gap-3">
-          <TriangleAlert className="h-5 w-5 text-rated-orange" aria-hidden="true" />
-          <h2 className="text-lg font-bold">Good to Know</h2>
-        </div>
-        <ul className="mt-5 space-y-3 text-sm text-muted-foreground">
-          <li className="flex items-start gap-2">
-            <span className="text-primary font-bold">•</span>
-            <span>
-              <strong className="text-foreground">Live submissions only:</strong> SolveBase syncs a
-              solution only after it witnesses your submit action and confirms the accepted result.
-              It does not scrape old platform submissions in bulk. LeetCode contest and Explore
-              editors are not supported in version 1.0.0.
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary font-bold">•</span>
-            <span>
-              <strong className="text-foreground">Session Maintenance:</strong> Syncing utilizes
-              your active browser login cookies. If your session expires, the extension displays a
-              reconnect notification. Submit again after reconnecting if a sync could not complete.
-            </span>
-          </li>
-        </ul>
-      </section>
-
-      <section className="py-16" aria-labelledby="faq-title">
-        <h2 id="faq-title" className="text-2xl font-bold">
-          Frequently Asked Questions
+      <section className="site-reveal py-20" aria-labelledby="faq-title">
+        <div className="section-kicker">Questions, answered</div>
+        <h2 id="faq-title" className="new-section-title mt-3">
+          No mystery
+          <br />
+          behind the sync.
         </h2>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Clear answers about installation, supported coding platforms, GitHub access, and how
-          SolveBase handles your source code.
-        </p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <div className="faq-list mt-10">
           {FAQS.map((item) => (
-            <article key={item.question} className="glass-card rounded-xl p-5">
-              <h3 className="text-base font-bold text-foreground">{item.question}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.answer}</p>
-            </article>
+            <details key={item.question}>
+              <summary>
+                <span className="faq-question">
+                  <span className="faq-mark">?</span>
+                  {item.question}
+                </span>
+                <span className="faq-toggle">+</span>
+              </summary>
+              <div className="faq-answer">
+                <p>{item.answer}</p>
+                <span className="faq-answer-line" />
+              </div>
+            </details>
           ))}
         </div>
       </section>
 
-      <footer className="mt-16 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 font-mono text-xs text-muted-foreground sm:flex-row">
-        <span>SolveBase — Live CP Solution Syncing</span>
-        <nav className="flex flex-wrap items-center justify-center gap-4" aria-label="Footer">
-          <a className="transition-colors hover:text-foreground" href="/privacy">
-            Privacy
-          </a>
+      <footer className="site-footer">
+        <div className="flex items-center gap-3">
+          <img src="/solvebase-brand.png" alt="" className="h-8 w-8 rounded-lg" />
+          <span className="font-mono text-xs font-black">SOLVEBASE</span>
+        </div>
+        <span className="font-mono text-xs text-muted-foreground">Live CP solution syncing</span>
+        <nav className="flex gap-5 font-mono text-xs text-muted-foreground">
+          <a href="/privacy">Privacy</a>
           <a
-            className="transition-colors hover:text-foreground"
             href="https://github.com/TushalLohar/SolveBase/issues"
             target="_blank"
             rel="noreferrer"
           >
             Support
+          </a>
+          <a href="https://github.com/TushalLohar/SolveBase" target="_blank" rel="noreferrer">
+            GitHub
           </a>
         </nav>
       </footer>

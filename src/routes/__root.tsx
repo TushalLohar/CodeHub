@@ -87,7 +87,10 @@ export const Route = createRootRoute({
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", type: "image/png", href: "/solvebase-brand.png" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", type: "image/png", sizes: "48x48", href: "/favicon-48.png" },
+      { rel: "icon", type: "image/png", sizes: "96x96", href: "/favicon-96.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/favicon-192.png" },
     ],
   }),
 
